@@ -90,8 +90,13 @@ export default function VenueDetails() {
     const ref = generateRefId();
     setBookingRef(ref);
 
+    // 10-second timeout to prevent infinite loading on network block
+    const timeout = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error("Request timed out. Please disable any AdBlockers or check your connection.")), 10000)
+    );
+
     try {
-      await addDoc(collection(db, "bookings"), {
+      const bookingAction = addDoc(collection(db, "bookings"), {
         referenceId: ref,
         venueId: venue.id,
         venueName: venue.name,
@@ -105,10 +110,12 @@ export default function VenueDetails() {
         status: "pending",
         createdAt: serverTimestamp()
       });
+
+      await Promise.race([bookingAction, timeout]);
       setBookingStep("success");
-    } catch (error) {
-      console.error("Firebase Error:", error);
-      alert("Failed to save booking. Check console.");
+    } catch (error: any) {
+      console.error("Booking Error:", error);
+      alert(error.message || "Failed to save booking. Please try again.");
       setBookingStep("idle");
     }
   };
