@@ -12,22 +12,22 @@ export function VenueGrid() {
   return (
     <section id="venues" className="w-full bg-white px-6 py-16 lg:py-24">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-16 flex items-end justify-between border-b-[0.5px] border-zinc-200 pb-4">
-          <div>
+        <div className="mb-16 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between border-b-[0.5px] border-zinc-200 pb-6">
+          <div className="max-w-xl">
             <h2 className="font-serif text-3xl font-light tracking-tighter text-black md:text-5xl">{t("grid_title")}</h2>
-            <p className="mt-2 text-sm font-medium text-zinc-600 max-w-sm">
+            <p className="mt-4 text-sm font-medium text-zinc-500 leading-relaxed">
               {t("grid_subtitle")}
             </p>
           </div>
-        <div className="flex gap-4 pb-4">
-          <button className="text-xs font-bold uppercase tracking-widest text-zinc-400 hover:text-black dark:hover:text-white transition-colors">
-            {t("grid_all")}
-          </button>
-          <button className="text-xs font-bold uppercase tracking-widest text-zinc-400 hover:text-black dark:hover:text-white transition-colors">
-            {t("grid_filtered")}
-          </button>
+          <div className="flex gap-8 border-t-[0.5px] border-zinc-100 pt-6 lg:border-none lg:pt-0">
+            <button className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-black transition-colors">
+              {t("grid_all")}
+            </button>
+            <button className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-black transition-colors">
+              {t("grid_filtered")}
+            </button>
+          </div>
         </div>
-      </div>
 
       <div className="grid gap-12 sm:grid-cols-2 lg:grid-cols-3">
         {venues.map((venue, idx) => (
