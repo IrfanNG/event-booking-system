@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useRef, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
@@ -12,6 +14,9 @@ import "react-day-picker/dist/style.css";
 
 import { useLanguage } from "@/context/LanguageContext";
 
+import { db } from "@/lib/firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+
 export default function VenueDetails() {
   const { id } = useParams();
   const venue = venues.find((v) => v.id === id);
@@ -19,9 +24,14 @@ export default function VenueDetails() {
   
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [guestCount, setGuestCount] = useState(1);
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<"full" | "morning" | "evening">("full");
   const [showCalendar, setShowCalendar] = useState(false);
   const [bookingStep, setBookingStep] = useState<"idle" | "confirm" | "processing" | "success">("idle");
   const [bookingRef, setBookingRef] = useState("");
+
+  // Contact Info State
+  const [userData, setUserData] = useState({ name: "", email: "", phone: "" });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const calendarRef = useRef<HTMLDivElement>(null);
 
@@ -44,6 +54,27 @@ export default function VenueDetails() {
     );
   }
 
+  const validate = () => {
+    const newErrors: Record<string, string> = {};
+    if (!userData.name) newErrors.name = t("val_required");
+    if (!userData.email) newErrors.email = t("val_required");
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userData.email)) newErrors.email = t("val_invalid_email");
+    if (!userData.phone) newErrors.phone = t("val_required");
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const getPriceFactor = () => {
+    return selectedTimeSlot === "full" ? 1 : 0.6;
+  };
+
+  const calculateTotal = () => {
+    const base = venue.price * getPriceFactor();
+    const serviceFee = base * 0.1;
+    return base + serviceFee;
+  };
+
   const generateRefId = () => {
     const date = format(new Date(), "yyyyMMdd");
     const random = Math.floor(100 + Math.random() * 900);
@@ -51,16 +82,41 @@ export default function VenueDetails() {
   };
 
   const handleStartBooking = () => {
-    if (selectedDate) setBookingStep("confirm");
+    if (selectedDate && validate()) setBookingStep("confirm");
   };
 
-  const handleFinalConfirm = () => {
+  const handleFinalConfirm = async () => {
     setBookingStep("processing");
-    setBookingRef(generateRefId());
-    // Simulate API call
-    setTimeout(() => {
+    const ref = generateRefId();
+    setBookingRef(ref);
+
+    try {
+      await addDoc(collection(db, "bookings"), {
+        referenceId: ref,
+        venueId: venue.id,
+        venueName: venue.name,
+        date: selectedDate,
+        timeSlot: selectedTimeSlot,
+        guests: guestCount,
+        customerName: userData.name,
+        customerEmail: userData.email,
+        customerPhone: userData.phone,
+        totalPrice: calculateTotal(),
+        status: "pending",
+        createdAt: serverTimestamp()
+      });
       setBookingStep("success");
-    }, 2000);
+    } catch (error) {
+      console.error("Firebase Error:", error);
+      alert("Failed to save booking. Check console.");
+      setBookingStep("idle");
+    }
+  };
+
+  const getTimeSlotLabel = (slot: string) => {
+    if (slot === "full") return t("slot_full");
+    if (slot === "morning") return t("slot_morning");
+    return t("slot_evening");
   };
 
   return (
@@ -102,12 +158,16 @@ export default function VenueDetails() {
                     <span className="text-sm font-bold">{selectedDate ? format(selectedDate, "PPP") : ""}</span>
                   </div>
                   <div className="flex justify-between border-b border-zinc-100 pb-2">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">{t("confirm_time")}</span>
+                    <span className="text-sm font-bold">{getTimeSlotLabel(selectedTimeSlot)}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-zinc-100 pb-2">
                     <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">{t("confirm_guest_count")}</span>
                     <span className="text-sm font-bold">{guestCount} {t("sidebar_guests")}</span>
                   </div>
                   <div className="flex justify-between pt-4 border-t-2 border-zinc-900">
                     <span className="text-lg font-serif">{t("sidebar_total")}</span>
-                    <span className="text-lg font-bold">RM {(venue.price * 1.1).toLocaleString()}</span>
+                    <span className="text-lg font-bold">RM {calculateTotal().toLocaleString()}</span>
                   </div>
                 </div>
 
@@ -157,6 +217,16 @@ export default function VenueDetails() {
                 <div className="mb-8 p-4 bg-zinc-50 border-[0.5px] border-zinc-100">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-1">{t("success_ref")}</p>
                   <p className="text-xl font-bold tracking-tight">{bookingRef}</p>
+                </div>
+                <div className="mb-8 p-4 text-left border-[0.5px] border-zinc-200">
+                  <div className="flex justify-between mb-2">
+                    <span className="text-[10px] uppercase font-bold text-zinc-400">{t("confirm_date")}</span>
+                    <span className="text-sm font-bold">{selectedDate ? format(selectedDate, "PPP") : ""}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[10px] uppercase font-bold text-zinc-400">{t("confirm_time")}</span>
+                    <span className="text-sm font-bold">{getTimeSlotLabel(selectedTimeSlot)}</span>
+                  </div>
                 </div>
                 <p className="text-sm text-zinc-600 leading-relaxed mb-12">
                   {t("success_msg").replace("{name}", venue.name)}
@@ -257,7 +327,7 @@ export default function VenueDetails() {
             <div className="sticky top-28 border-[0.5px] border-zinc-200 bg-white p-8 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.05)]">
               <div className="flex items-end justify-between mb-8">
                 <div>
-                  <span className="text-2xl font-bold text-black font-serif">RM {venue.price.toLocaleString()}</span>
+                  <span className="text-2xl font-bold text-black font-serif">RM {(venue.price * getPriceFactor()).toLocaleString()}</span>
                   <span className="ml-1 text-xs font-bold uppercase tracking-widest text-zinc-400">{t("sidebar_day")}</span>
                 </div>
               </div>
@@ -298,11 +368,45 @@ export default function VenueDetails() {
                   </AnimatePresence>
                 </div>
 
-                {/* Guest Stepper */}
+                {/* Time Slot Selection */}
+                <div className="border-[0.5px] border-zinc-200 p-4 transition-colors hover:border-black group">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 group-hover:text-black block mb-1">{t("sidebar_timeslot")}</label>
+                  <select 
+                    value={selectedTimeSlot}
+                    onChange={(e) => setSelectedTimeSlot(e.target.value as any)}
+                    className="w-full text-sm font-medium text-black bg-transparent border-none focus:ring-0 p-0 cursor-pointer appearance-none"
+                  >
+                    <option value="full">{t("slot_full")}</option>
+                    <option value="morning">{t("slot_morning")}</option>
+                    <option value="evening">{t("slot_evening")}</option>
+                  </select>
+                </div>
+
+                {/* Guest Input with Stepper */}
                 <div className="border-[0.5px] border-zinc-200 p-4 transition-colors hover:border-black group">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 group-hover:text-black block mb-1">{t("sidebar_guests")}</label>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-black">{guestCount} {t("sidebar_guests")}</span>
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="number"
+                        value={guestCount || ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === "") {
+                            setGuestCount(0);
+                            return;
+                          }
+                          const num = parseInt(val);
+                          setGuestCount(Math.max(0, Math.min(venue.capacity, num)));
+                        }}
+                        onFocus={(e) => e.target.select()}
+                        onBlur={() => {
+                          if (guestCount < 1) setGuestCount(1);
+                        }}
+                        className="w-20 text-sm font-medium text-black bg-transparent border-none focus:ring-0 p-0"
+                      />
+                      <span className="text-sm font-medium text-black">{t("sidebar_guests")}</span>
+                    </div>
                     <div className="flex items-center gap-3">
                       <button 
                         onClick={() => setGuestCount(Math.max(1, guestCount - 1))}
@@ -321,6 +425,45 @@ export default function VenueDetails() {
                   <p className="text-[9px] font-medium text-zinc-400 mt-2 uppercase tracking-wide">
                     {t("sidebar_max_guests").replace("{count}", venue.capacity.toString())}
                   </p>
+                </div>
+
+                {/* Contact Info Fields (NEW) */}
+                <div className="space-y-4 pt-4 border-t border-zinc-50">
+                  <div className={`border-[0.5px] p-4 transition-colors ${errors.name ? 'border-red-500 bg-red-50/10' : 'border-zinc-200 hover:border-black'} group`}>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 group-hover:text-black block mb-1">{t("sidebar_name")}</label>
+                    <input 
+                      type="text"
+                      value={userData.name}
+                      placeholder="Jane Doe"
+                      onChange={(e) => setUserData({ ...userData, name: e.target.value })}
+                      className="w-full text-sm font-medium text-black bg-transparent border-none focus:ring-0 p-0 placeholder:text-zinc-200 text-black"
+                    />
+                    {errors.name && <p className="text-[9px] font-bold text-red-500 uppercase mt-1 tracking-tighter">{errors.name}</p>}
+                  </div>
+
+                  <div className={`border-[0.5px] p-4 transition-colors ${errors.email ? 'border-red-500 bg-red-50/10' : 'border-zinc-200 hover:border-black'} group`}>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 group-hover:text-black block mb-1">{t("sidebar_email")}</label>
+                    <input 
+                      type="email"
+                      value={userData.email}
+                      placeholder="jane@example.com"
+                      onChange={(e) => setUserData({ ...userData, email: e.target.value })}
+                      className="w-full text-sm font-medium text-black bg-transparent border-none focus:ring-0 p-0 placeholder:text-zinc-200 text-black"
+                    />
+                    {errors.email && <p className="text-[9px] font-bold text-red-500 uppercase mt-1 tracking-tighter">{errors.email}</p>}
+                  </div>
+
+                  <div className={`border-[0.5px] p-4 transition-colors ${errors.phone ? 'border-red-500 bg-red-50/10' : 'border-zinc-200 hover:border-black'} group`}>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 group-hover:text-black block mb-1">{t("sidebar_phone")}</label>
+                    <input 
+                      type="tel"
+                      value={userData.phone}
+                      placeholder="+6012-3456789"
+                      onChange={(e) => setUserData({ ...userData, phone: e.target.value })}
+                      className="w-full text-sm font-medium text-black bg-transparent border-none focus:ring-0 p-0 placeholder:text-zinc-200 text-black"
+                    />
+                    {errors.phone && <p className="text-[9px] font-bold text-red-500 uppercase mt-1 tracking-tighter">{errors.phone}</p>}
+                  </div>
                 </div>
               </div>
 
@@ -343,15 +486,15 @@ export default function VenueDetails() {
               <div className="mt-8 space-y-3 pt-6 border-t border-zinc-100">
                 <div className="flex justify-between text-sm text-zinc-500">
                   <span>{t("sidebar_base")}</span>
-                  <span className="font-medium text-black">RM {venue.price.toLocaleString()}</span>
+                  <span className="font-medium text-black">RM {(venue.price * getPriceFactor()).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-sm text-zinc-500">
                   <span>{t("sidebar_fee")}</span>
-                  <span className="font-medium text-black">RM {(venue.price * 0.1).toLocaleString()}</span>
+                  <span className="font-medium text-black">RM {(venue.price * getPriceFactor() * 0.1).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between pt-4 text-black font-bold border-t border-zinc-50">
                   <span className="font-serif text-lg leading-none">{t("sidebar_total")}</span>
-                  <span className="text-lg leading-none">RM {(venue.price * 1.1).toLocaleString()}</span>
+                  <span className="text-lg leading-none">RM {calculateTotal().toLocaleString()}</span>
                 </div>
               </div>
             </div>
@@ -387,6 +530,15 @@ export default function VenueDetails() {
           text-transform: uppercase;
           letter-spacing: 0.1em;
           color: #a1a1aa;
+        }
+        /* Hide arrows for guest input */
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        input[type=number] {
+          -moz-appearance: textfield;
         }
       `}</style>
     </div>

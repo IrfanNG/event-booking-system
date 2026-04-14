@@ -55,12 +55,24 @@ export const translations = {
     sidebar_day: "/ Day",
     sidebar_min_guests: "Min 1 guest",
     sidebar_max_guests: "Max {count} guests",
+    sidebar_timeslot: "Time Slot",
+    sidebar_name: "Full Name",
+    sidebar_email: "Email Address",
+    sidebar_phone: "Phone Number",
+    slot_full: "Full Day (8AM - 10PM)",
+    slot_morning: "Morning (8AM - 1PM)",
+    slot_evening: "Evening (2PM - 10PM)",
+    
+    // Validation
+    val_required: "This field is required",
+    val_invalid_email: "Please enter a valid email",
     
     // Confirmation
     confirm_title: "Confirm Your Reservation",
     confirm_summary: "Review details before final confirmation.",
     confirm_venue: "Venue",
     confirm_date: "Booking Date",
+    confirm_time: "Time Slot",
     confirm_guest_count: "No. of Guests",
     confirm_back: "Go Back",
     confirm_final: "Confirm Booking",
@@ -113,12 +125,24 @@ export const translations = {
     sidebar_day: "/ Hari",
     sidebar_min_guests: "Min 1 tetamu",
     sidebar_max_guests: "Maks {count} tetamu",
+    sidebar_timeslot: "Slot Masa",
+    sidebar_name: "Nama Penuh",
+    sidebar_email: "Alamat Emel",
+    sidebar_phone: "No. Telefon",
+    slot_full: "Sepanjang Hari (8PG - 10MLM)",
+    slot_morning: "Pagi (8PG - 1PTG)",
+    slot_evening: "Petang/Malam (2PTG - 10MLM)",
+
+    // Validation
+    val_required: "Ruangan ini wajib diisi",
+    val_invalid_email: "Sila masukkan emel yang sah",
 
     // Confirmation
     confirm_title: "Sahkan Tempahan Anda",
     confirm_summary: "Semak butiran sebelum pengesahan akhir.",
     confirm_venue: "Dewan",
     confirm_date: "Tarikh Tempahan",
+    confirm_time: "Slot Masa",
     confirm_guest_count: "Bil. Tetamu",
     confirm_back: "Kembali",
     confirm_final: "Sahkan Tempahan",
