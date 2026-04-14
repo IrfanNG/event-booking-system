@@ -1,4 +1,6 @@
-import type { Metadata } from "next";
+"use client";
+
+import { usePathname } from "next/navigation";
 import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/context/LanguageContext";
@@ -14,21 +16,19 @@ const playfair = Playfair_Display({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Espace | Premier Venue Booking",
-  description: "Book elite event spaces for your next big moment.",
-};
-
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const pathname = usePathname();
+  const isAdminPage = pathname?.startsWith("/admin");
+
   return (
     <html lang="en" className={`${inter.variable} ${playfair.variable} antialiased`}>
       <body className="min-h-screen bg-background text-foreground selection:bg-zinc-200 dark:selection:bg-zinc-800">
         <LanguageProvider>
-          <Navbar />
+          {!isAdminPage && <Navbar />}
           {children}
         </LanguageProvider>
       </body>

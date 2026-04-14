@@ -1,7 +1,12 @@
+"use client";
+
 import { Hero } from "@/components/landing/Hero";
 import { VenueGrid } from "@/components/landing/VenueGrid";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function Home() {
+  const { t } = useLanguage();
+
   return (
     <div className="flex flex-col min-h-screen">
       <main>
@@ -13,19 +18,13 @@ export default function Home() {
           <div className="mx-auto max-w-7xl">
             <div className="grid gap-12 lg:gap-16 lg:grid-cols-2 lg:items-center">
               <div>
-                <h2 className="font-serif text-3xl lg:text-5xl font-light tracking-tighter text-black leading-tight">
-                  Curated Spaces for <br className="hidden lg:block" /> Iconic Moments.
-                </h2>
+                <h2 
+                  className="font-serif text-3xl lg:text-5xl font-light tracking-tighter text-black leading-tight"
+                  dangerouslySetInnerHTML={{ __html: t("about_title").replace("Iconic Moments.", "<br className='hidden lg:block' /> Iconic Moments.") }}
+                />
                 <div className="mt-8 lg:mt-12 space-y-6 text-zinc-500 max-w-lg leading-relaxed text-sm lg:text-base">
-                  <p>
-                    ESPACE is a collection of high-end event venues designed for those who value 
-                    aesthetic precision and functional excellence. From minimalist galleries 
-                    to industrial lofts, every space in our portfolio is hand-picked.
-                  </p>
-                  <p>
-                    Our mission is to simplify the booking experience without compromising 
-                    on the institutional quality that professional event planners demand.
-                  </p>
+                  <p>{t("about_p1")}</p>
+                  <p>{t("about_p2")}</p>
                 </div>
               </div>
               <div className="relative aspect-square bg-zinc-200 border-[0.5px] border-zinc-300 overflow-hidden group">
@@ -44,14 +43,14 @@ export default function Home() {
         <section id="contact" className="w-full bg-white py-16 lg:py-32 px-6 border-t-[0.5px] border-zinc-200">
           <div className="mx-auto max-w-7xl">
             <div className="mb-12 lg:mb-16">
-              <h2 className="font-serif text-3xl lg:text-4xl tracking-tighter text-black">Get in Touch</h2>
-              <p className="mt-4 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Connect with our venue curators</p>
+              <h2 className="font-serif text-3xl lg:text-4xl tracking-tighter text-black">{t("contact_title")}</h2>
+              <p className="mt-4 text-[10px] font-bold uppercase tracking-widest text-zinc-400">{t("contact_subtitle")}</p>
             </div>
             
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <ContactCard label="Email" value="concierge@espace.com" />
-              <ContactCard label="Location" value="Level 42, Elite Tower, KL" />
-              <ContactCard label="Phone" value="+60 12 345 6789" />
+              <ContactCard label={t("contact_email")} value="concierge@espace.com" />
+              <ContactCard label={t("contact_location")} value="Level 42, Elite Tower, KL" />
+              <ContactCard label={t("contact_phone")} value="+60 12 345 6789" />
             </div>
           </div>
         </section>

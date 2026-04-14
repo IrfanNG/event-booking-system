@@ -28,6 +28,18 @@ export const translations = {
     hero_curated: "Curated Selection",
     hero_hospitality: "Institutional Hospitality",
     
+    // About
+    about_title: "Curated Spaces for Iconic Moments.",
+    about_p1: "ESPACE is a collection of high-end event venues designed for those who value aesthetic precision and functional excellence. From minimalist galleries to industrial lofts, every space in our portfolio is hand-picked.",
+    about_p2: "Our mission is to simplify the booking experience without compromising on the institutional quality that professional event planners demand.",
+    
+    // Contact
+    contact_title: "Get in Touch",
+    contact_subtitle: "Connect with our venue curators",
+    contact_email: "Email",
+    contact_location: "Location",
+    contact_phone: "Phone",
+    
     // Venue Grid
     grid_title: "Our Venues",
     grid_subtitle: "Carefully curated spaces for every kind of event, from creative studios to formal ballrooms.",
@@ -97,6 +109,18 @@ export const translations = {
     btn_learn_more: "Ketahui Lanjut",
     hero_curated: "Pilihan Terpilih",
     hero_hospitality: "Hospitaliti Institusi",
+    
+    // About
+    about_title: "Ruang Terpilih untuk Momen Ikonik.",
+    about_p1: "ESPACE adalah koleksi dewan acara mewah yang direka untuk mereka yang menghargai ketepatan estetik dan kecemerlangan fungsional. Dari galeri minimalis ke lot industri, setiap ruang dalam portfolio kami dipilih dengan teliti.",
+    about_p2: "Misi kami adalah untuk memudahkan pengalaman tempahan tanpa menjejaskan kualiti institusi yang dituntut oleh perancang acara profesional.",
+    
+    // Contact
+    contact_title: "Hubungi Kami",
+    contact_subtitle: "Berhubung dengan kurator dewan kami",
+    contact_email: "Emel",
+    contact_location: "Lokasi",
+    contact_phone: "Telefon",
     
     // Venue Grid
     grid_title: "Dewan Kami",
