@@ -13,7 +13,7 @@ export function Navbar() {
           <Link href="/" className="font-serif text-2xl font-bold tracking-tighter text-zinc-900 dark:text-zinc-50">
             ESPACE
           </Link>
-          <div className="hidden space-x-6 text-sm font-medium tracking-tight text-zinc-500 dark:text-zinc-400 md:flex">
+          <div className="flex space-x-4 lg:space-x-8 text-[11px] lg:text-sm font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
             <Link href="#venues" className="transition-colors hover:text-zinc-900 dark:hover:text-zinc-100">{t("nav_venues")}</Link>
             <Link href="#about" className="transition-colors hover:text-zinc-900 dark:hover:text-zinc-100">{t("nav_about")}</Link>
             <Link href="#contact" className="transition-colors hover:text-zinc-900 dark:hover:text-zinc-100">{t("nav_contact")}</Link>

@@ -10,7 +10,7 @@ export function VenueGrid() {
   const { t } = useLanguage();
 
   return (
-    <section id="venues" className="w-full bg-white px-6 py-24">
+    <section id="venues" className="w-full bg-white px-6 py-16 lg:py-24">
       <div className="mx-auto max-w-7xl">
         <div className="mb-16 flex items-end justify-between border-b-[0.5px] border-zinc-200 pb-4">
           <div>
@@ -33,9 +33,8 @@ export function VenueGrid() {
         {venues.map((venue, idx) => (
           <Link key={venue.id} href={`/venues/${venue.id}`}>
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
+              initial={{ y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.1 }}
               className="group block cursor-pointer"
             >

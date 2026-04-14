@@ -8,19 +8,17 @@ export default function Home() {
       <Navbar />
       <main>
         <Hero />
-      <main>
-        <Hero />
         <VenueGrid />
         
         {/* About Section */}
-        <section id="about" className="w-full bg-zinc-50 py-32 px-6 border-t-[0.5px] border-zinc-200">
+        <section id="about" className="w-full bg-zinc-50 py-16 lg:py-32 px-6 border-t-[0.5px] border-zinc-200">
           <div className="mx-auto max-w-7xl">
-            <div className="grid gap-16 lg:grid-cols-2 lg:items-center">
+            <div className="grid gap-12 lg:gap-16 lg:grid-cols-2 lg:items-center">
               <div>
-                <h2 className="font-serif text-5xl font-light tracking-tighter text-black leading-tight">
-                  Curated Spaces for <br /> Iconic Moments.
+                <h2 className="font-serif text-3xl lg:text-5xl font-light tracking-tighter text-black leading-tight">
+                  Curated Spaces for <br className="hidden lg:block" /> Iconic Moments.
                 </h2>
-                <div className="mt-12 space-y-6 text-zinc-500 max-w-lg leading-relaxed">
+                <div className="mt-8 lg:mt-12 space-y-6 text-zinc-500 max-w-lg leading-relaxed text-sm lg:text-base">
                   <p>
                     ESPACE is a collection of high-end event venues designed for those who value 
                     aesthetic precision and functional excellence. From minimalist galleries 
@@ -32,26 +30,27 @@ export default function Home() {
                   </p>
                 </div>
               </div>
-              <div className="relative aspect-square bg-zinc-200 border-[0.5px] border-zinc-300 overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-tr from-zinc-900/10 to-transparent" />
-                {/* Image Placeholder logic: use the Hero or a pattern if no direct image */}
-                <div className="flex h-full w-full items-center justify-center text-[10px] font-bold uppercase tracking-widest text-zinc-400">
-                  Institutional Minimalist Core
-                </div>
+              <div className="relative aspect-square bg-zinc-200 border-[0.5px] border-zinc-300 overflow-hidden group">
+                <img 
+                  src="https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=2069&auto=format&fit=crop"
+                  alt="Institutional Minimalist Core"
+                  className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
+                />
+                <div className="absolute inset-0 bg-black/5 group-hover:bg-transparent transition-colors" />
               </div>
             </div>
           </div>
         </section>
 
         {/* Contact Section */}
-        <section id="contact" className="w-full bg-white py-32 px-6 border-t-[0.5px] border-zinc-200">
+        <section id="contact" className="w-full bg-white py-16 lg:py-32 px-6 border-t-[0.5px] border-zinc-200">
           <div className="mx-auto max-w-7xl">
-            <div className="mb-16">
-              <h2 className="font-serif text-4xl tracking-tighter">Get in Touch</h2>
-              <p className="mt-4 text-xs font-bold uppercase tracking-widest text-zinc-400">Connect with our venue curators</p>
+            <div className="mb-12 lg:mb-16">
+              <h2 className="font-serif text-3xl lg:text-4xl tracking-tighter text-black">Get in Touch</h2>
+              <p className="mt-4 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Connect with our venue curators</p>
             </div>
             
-            <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <ContactCard label="Email" value="concierge@espace.com" />
               <ContactCard label="Location" value="Level 42, Elite Tower, KL" />
               <ContactCard label="Phone" value="+60 12 345 6789" />

@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Link from "next/link";
 
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -8,28 +9,34 @@ export function Hero() {
   const { t } = useLanguage();
 
   return (
-    <section className="relative flex min-h-[70vh] w-full flex-col items-center justify-center border-b-[0.5px] border-zinc-200 bg-white px-6 text-center dark:border-zinc-800 dark:bg-black">
+    <section className="relative flex w-full flex-col items-center justify-center border-b-[0.5px] border-zinc-200 bg-white px-6 py-20 lg:py-32 text-center dark:border-zinc-800 dark:bg-black">
       <motion.div
-        initial={{ opacity: 0, y: 30 }}
+        initial={{ y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
         className="max-w-4xl"
       >
-        <h1 className="font-serif text-5xl font-light tracking-tighter text-black dark:text-white md:text-7xl lg:text-8.5vw leading-[1.1]">
+        <h1 className="font-serif text-4xl font-light tracking-tighter text-black dark:text-white md:text-7xl lg:text-8vw leading-[1.1]">
           Espace. <br />
           {t("hero_title")}
         </h1>
-        <p className="mx-auto mt-8 max-w-2xl text-lg text-zinc-600 dark:text-zinc-400 md:text-xl">
+        <p className="mx-auto mt-6 lg:mt-8 max-w-2xl text-base lg:text-xl text-zinc-600 dark:text-zinc-400">
           {t("hero_subtitle")}
         </p>
 
         <div className="mt-12 flex flex-col items-center justify-center gap-4 sm:flex-row">
-          <button className="flex h-12 w-48 items-center justify-center bg-black text-sm font-bold uppercase tracking-widest text-white transition-opacity hover:opacity-90 dark:bg-white dark:text-black">
+          <Link 
+            href="#venues"
+            className="flex h-12 w-48 items-center justify-center bg-black text-sm font-bold uppercase tracking-widest text-white transition-opacity hover:opacity-90 dark:bg-white dark:text-black"
+          >
             {t("btn_explore")}
-          </button>
-          <button className="flex h-12 w-48 items-center justify-center border-[0.5px] border-zinc-200 text-sm font-bold uppercase tracking-widest text-zinc-950 transition-colors hover:bg-zinc-100 dark:border-zinc-800 dark:text-white dark:hover:bg-zinc-900">
+          </Link>
+          <Link 
+            href="#about"
+            className="flex h-12 w-48 items-center justify-center border-[0.5px] border-zinc-200 text-sm font-bold uppercase tracking-widest text-zinc-950 transition-colors hover:bg-zinc-100 dark:border-zinc-800 dark:text-white dark:hover:bg-zinc-900"
+          >
             {t("btn_learn_more")}
-          </button>
+          </Link>
         </div>
       </motion.div>
 
