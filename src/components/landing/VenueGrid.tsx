@@ -6,14 +6,15 @@ import { motion } from "framer-motion";
 
 export function VenueGrid() {
   return (
-    <section className="mx-auto w-full max-w-7xl px-6 py-24">
-      <div className="mb-16 flex items-end justify-between border-b-[0.5px] border-zinc-200 pb-4 dark:border-zinc-800">
-        <div>
-          <h2 className="font-serif text-3xl font-light tracking-tighter text-zinc-900 dark:text-zinc-50 md:text-5xl">Our Venues</h2>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400 max-w-sm">
-            Carefully curated spaces for every kind of event, from creative studios to formal ballrooms.
-          </p>
-        </div>
+    <section className="w-full bg-white px-6 py-24">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-16 flex items-end justify-between border-b-[0.5px] border-zinc-200 pb-4">
+          <div>
+            <h2 className="font-serif text-3xl font-light tracking-tighter text-black md:text-5xl">Our Venues</h2>
+            <p className="mt-2 text-sm font-medium text-zinc-600 max-w-sm">
+              Carefully curated spaces for every kind of event, from creative studios to formal ballrooms.
+            </p>
+          </div>
         <div className="flex gap-4 pb-4">
           <button className="text-xs font-bold uppercase tracking-widest text-zinc-400 hover:text-black dark:hover:text-white transition-colors">
             All Venues
@@ -41,20 +42,20 @@ export function VenueGrid() {
                 fill
                 className="object-cover transition-transform duration-700 group-hover:scale-110"
               />
-              <div className="absolute top-4 left-4 bg-white/90 dark:bg-black/90 backdrop-blur-md px-3 py-1 text-[10px] font-bold uppercase tracking-widest thin-border text-zinc-900 dark:text-zinc-50">
+              <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-md px-3 py-1 text-[10px] font-bold uppercase tracking-widest thin-border text-black">
                 {venue.category}
               </div>
             </div>
 
             <div className="mt-6 flex justify-between items-start">
               <div>
-                <h3 className="font-serif text-xl tracking-tight">{venue.name}</h3>
+                <h3 className="font-serif text-xl tracking-tight text-black">{venue.name}</h3>
                 <p className="mt-1 text-xs text-zinc-500 uppercase tracking-widest font-bold">{venue.location}</p>
               </div>
-              <p className="text-sm font-bold tracking-tight">RM {venue.price}</p>
+              <p className="text-sm font-bold tracking-tight text-black">RM {venue.price}</p>
             </div>
             
-            <p className="mt-3 text-sm text-zinc-400 line-clamp-2 dark:text-zinc-500 leading-relaxed tracking-tight">
+            <p className="mt-3 text-sm text-zinc-600 line-clamp-2 leading-relaxed tracking-tight">
               {venue.description}
             </p>
 
@@ -62,7 +63,7 @@ export function VenueGrid() {
               {venue.amenities.slice(0, 3).map((amenity) => (
                 <span
                   key={amenity}
-                  className="rounded-full border-[0.5px] border-zinc-300 px-3 py-1 text-[10px] font-medium text-zinc-600 transition-colors hover:border-black hover:text-black dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-white dark:hover:text-white"
+                  className="rounded-full border-[0.5px] border-zinc-200 px-3 py-1 text-[10px] font-medium text-zinc-500 transition-colors hover:border-black hover:text-black"
                 >
                   {amenity}
                 </span>
@@ -71,6 +72,7 @@ export function VenueGrid() {
           </motion.div>
         ))}
       </div>
-    </section>
+    </div>
+  </section>
   );
 }

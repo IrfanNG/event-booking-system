@@ -11,7 +11,7 @@ export default function Home() {
         <VenueGrid />
       </main>
       
-      <footer className="w-full py-12 border-t-[0.5px] border-zinc-200 px-6 dark:border-zinc-800 text-center">
+      <footer className="w-full bg-white py-12 border-t-[0.5px] border-zinc-200 px-6 text-center">
         <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">
           ESPACE &copy; 2026. ALL RIGHTS RESERVED.
         </p>
