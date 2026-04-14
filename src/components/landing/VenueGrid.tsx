@@ -41,7 +41,7 @@ export function VenueGrid() {
                 fill
                 className="object-cover transition-transform duration-700 group-hover:scale-110"
               />
-              <div className="absolute top-4 left-4 bg-white/80 dark:bg-black/80 backdrop-blur-md px-3 py-1 text-[10px] font-bold uppercase tracking-widest thin-border">
+              <div className="absolute top-4 left-4 bg-white/90 dark:bg-black/90 backdrop-blur-md px-3 py-1 text-[10px] font-bold uppercase tracking-widest thin-border text-zinc-900 dark:text-zinc-50">
                 {venue.category}
               </div>
             </div>
@@ -62,7 +62,7 @@ export function VenueGrid() {
               {venue.amenities.slice(0, 3).map((amenity) => (
                 <span
                   key={amenity}
-                  className="rounded-full border-[0.5px] border-zinc-200 px-3 py-1 text-[10px] font-medium text-zinc-500 transition-colors hover:border-black hover:text-black dark:border-zinc-800 dark:hover:border-white dark:hover:text-white"
+                  className="rounded-full border-[0.5px] border-zinc-300 px-3 py-1 text-[10px] font-medium text-zinc-600 transition-colors hover:border-black hover:text-black dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-white dark:hover:text-white"
                 >
                   {amenity}
                 </span>

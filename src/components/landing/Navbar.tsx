@@ -11,7 +11,7 @@ export function Navbar() {
     <nav className="sticky top-0 z-50 w-full border-b-[0.5px] border-zinc-200 bg-white/70 backdrop-blur-md dark:border-zinc-800 dark:bg-black/70">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
         <div className="flex items-center gap-8">
-          <Link href="/" className="font-serif text-2xl font-bold tracking-tighter">
+          <Link href="/" className="font-serif text-2xl font-bold tracking-tighter text-zinc-900 dark:text-zinc-50">
             ESPACE
           </Link>
           <div className="hidden space-x-6 text-sm font-medium tracking-tight text-zinc-500 dark:text-zinc-400 md:flex">
