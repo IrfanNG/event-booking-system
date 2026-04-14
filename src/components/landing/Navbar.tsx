@@ -14,9 +14,9 @@ export function Navbar() {
             ESPACE
           </Link>
           <div className="hidden space-x-6 text-sm font-medium tracking-tight text-zinc-500 dark:text-zinc-400 md:flex">
-            <Link href="/" className="transition-colors hover:text-zinc-900 dark:hover:text-zinc-100">{t("nav_venues")}</Link>
-            <Link href="/" className="transition-colors hover:text-zinc-900 dark:hover:text-zinc-100">{t("nav_about")}</Link>
-            <Link href="/" className="transition-colors hover:text-zinc-900 dark:hover:text-zinc-100">{t("nav_contact")}</Link>
+            <Link href="#venues" className="transition-colors hover:text-zinc-900 dark:hover:text-zinc-100">{t("nav_venues")}</Link>
+            <Link href="#about" className="transition-colors hover:text-zinc-900 dark:hover:text-zinc-100">{t("nav_about")}</Link>
+            <Link href="#contact" className="transition-colors hover:text-zinc-900 dark:hover:text-zinc-100">{t("nav_contact")}</Link>
           </div>
         </div>
 
@@ -27,9 +27,12 @@ export function Navbar() {
           >
             {lang}
           </button>
-          <button className="bg-black px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200">
+          <Link 
+            href="#venues"
+            className="bg-black px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+          >
             {t("btn_book_now")}
-          </button>
+          </Link>
         </div>
       </div>
     </nav>

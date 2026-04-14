@@ -10,7 +10,7 @@ export function VenueGrid() {
   const { t } = useLanguage();
 
   return (
-    <section className="w-full bg-white px-6 py-24">
+    <section id="venues" className="w-full bg-white px-6 py-24">
       <div className="mx-auto max-w-7xl">
         <div className="mb-16 flex items-end justify-between border-b-[0.5px] border-zinc-200 pb-4">
           <div>
