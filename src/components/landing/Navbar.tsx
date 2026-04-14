@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useLanguage } from "@/context/LanguageContext";
 
 export function Navbar() {
-  const [lang, setLang] = useState<"EN" | "BM">("EN");
+  const { lang, setLang, t } = useLanguage();
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b-[0.5px] border-zinc-200 bg-white/70 backdrop-blur-md dark:border-zinc-800 dark:bg-black/70">
@@ -15,9 +14,9 @@ export function Navbar() {
             ESPACE
           </Link>
           <div className="hidden space-x-6 text-sm font-medium tracking-tight text-zinc-500 dark:text-zinc-400 md:flex">
-            <Link href="/venues" className="transition-colors hover:text-zinc-900 dark:hover:text-zinc-100">Venues</Link>
-            <Link href="/about" className="transition-colors hover:text-zinc-900 dark:hover:text-zinc-100">About</Link>
-            <Link href="/contact" className="transition-colors hover:text-zinc-900 dark:hover:text-zinc-100">Contact</Link>
+            <Link href="/" className="transition-colors hover:text-zinc-900 dark:hover:text-zinc-100">{t("nav_venues")}</Link>
+            <Link href="/" className="transition-colors hover:text-zinc-900 dark:hover:text-zinc-100">{t("nav_about")}</Link>
+            <Link href="/" className="transition-colors hover:text-zinc-900 dark:hover:text-zinc-100">{t("nav_contact")}</Link>
           </div>
         </div>
 
@@ -29,7 +28,7 @@ export function Navbar() {
             {lang}
           </button>
           <button className="bg-black px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200">
-            Book Now
+            {t("btn_book_now")}
           </button>
         </div>
       </div>

@@ -6,22 +6,24 @@ import { venues } from "@/lib/mockData";
 import { motion } from "framer-motion";
 
 export function VenueGrid() {
+  const { t } = useLanguage();
+
   return (
     <section className="w-full bg-white px-6 py-24">
       <div className="mx-auto max-w-7xl">
         <div className="mb-16 flex items-end justify-between border-b-[0.5px] border-zinc-200 pb-4">
           <div>
-            <h2 className="font-serif text-3xl font-light tracking-tighter text-black md:text-5xl">Our Venues</h2>
+            <h2 className="font-serif text-3xl font-light tracking-tighter text-black md:text-5xl">{t("grid_title")}</h2>
             <p className="mt-2 text-sm font-medium text-zinc-600 max-w-sm">
-              Carefully curated spaces for every kind of event, from creative studios to formal ballrooms.
+              {t("grid_subtitle")}
             </p>
           </div>
         <div className="flex gap-4 pb-4">
           <button className="text-xs font-bold uppercase tracking-widest text-zinc-400 hover:text-black dark:hover:text-white transition-colors">
-            All Venues
+            {t("grid_all")}
           </button>
           <button className="text-xs font-bold uppercase tracking-widest text-zinc-400 hover:text-black dark:hover:text-white transition-colors">
-            Filtered View
+            {t("grid_filtered")}
           </button>
         </div>
       </div>
