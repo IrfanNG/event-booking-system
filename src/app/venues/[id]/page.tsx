@@ -128,8 +128,6 @@ export default function VenueDetails() {
 
   return (
     <div className="flex min-h-screen flex-col bg-white text-black">
-      <Navbar />
-
       <main className="mx-auto w-full max-w-7xl px-6 py-12">
         {/* Step-based Modals */}
         <AnimatePresence>
