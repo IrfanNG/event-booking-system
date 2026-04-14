@@ -64,12 +64,12 @@ export default function CustomersPage() {
           <div className="relative z-10">
             <div className="flex items-center gap-2 mb-6">
               <div className="h-6 w-1 bg-black" />
-              <h2 className="text-[10px] font-bold uppercase tracking-widest text-black">Maya's Intelligence Log</h2>
+              <h2 className="text-[10px] font-bold uppercase tracking-widest text-black">Intelligence Log</h2>
             </div>
             <p className="text-xl font-serif text-black leading-relaxed">
-              "System analysis complete. 
+              "Operational analysis complete. 
               We have <span className="font-bold underline text-green-600">{stats.returning} returning clients</span> who contribute to <span className="font-bold">45%</span> of total revenue. 
-              Recommendation: Target <span className="font-bold">{stats.topCustomer}</span> for a loyalty preview of new venues."
+              Recommendation: Engage <span className="font-bold">{stats.topCustomer}</span> for primary venue allocations."
             </p>
           </div>
         </div>
@@ -77,7 +77,7 @@ export default function CustomersPage() {
         <div className="border-[0.5px] border-zinc-200 bg-zinc-900 p-8 shadow-lg text-white">
           <div className="flex items-center gap-2 mb-8">
             <TrendingUp className="h-4 w-4 text-green-400" />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Jargon's Efficiency Core</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Efficiency Core</span>
           </div>
           <div className="space-y-6">
             <div>
