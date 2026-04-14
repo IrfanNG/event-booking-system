@@ -53,10 +53,22 @@ export const translations = {
     sidebar_fee: "Service Fee (10%)",
     sidebar_total: "Total",
     sidebar_day: "/ Day",
+    sidebar_min_guests: "Min 1 guest",
+    sidebar_max_guests: "Max {count} guests",
+    
+    // Confirmation
+    confirm_title: "Confirm Your Reservation",
+    confirm_summary: "Review details before final confirmation.",
+    confirm_venue: "Venue",
+    confirm_date: "Booking Date",
+    confirm_guest_count: "No. of Guests",
+    confirm_back: "Go Back",
+    confirm_final: "Confirm Booking",
     
     // Success
     success_title: "Booking Confirmed.",
     success_msg: "Your reservation for {name} has been received. Check your invite dashboard for details soon.",
+    success_ref: "Reference ID",
     success_btn: "Back to Dashboard"
   },
   BM: {
@@ -99,13 +111,25 @@ export const translations = {
     sidebar_fee: "Yuran Servis (10%)",
     sidebar_total: "Jumlah",
     sidebar_day: "/ Hari",
+    sidebar_min_guests: "Min 1 tetamu",
+    sidebar_max_guests: "Maks {count} tetamu",
+
+    // Confirmation
+    confirm_title: "Sahkan Tempahan Anda",
+    confirm_summary: "Semak butiran sebelum pengesahan akhir.",
+    confirm_venue: "Dewan",
+    confirm_date: "Tarikh Tempahan",
+    confirm_guest_count: "Bil. Tetamu",
+    confirm_back: "Kembali",
+    confirm_final: "Sahkan Tempahan",
     
     // Success
     success_title: "Tempahan Disahkan.",
     success_msg: "Tempahan anda untuk {name} telah diterima. Semak papan pemuka jemputan anda untuk butiran lanjut.",
+    success_ref: "ID Rujukan",
     success_btn: "Kembali ke Papan Pemuka"
   }
-};
+}
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [lang, setLang] = useState<Language>("EN");
