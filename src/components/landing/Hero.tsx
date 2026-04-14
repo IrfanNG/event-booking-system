@@ -11,11 +11,11 @@ export function Hero() {
         transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
         className="max-w-4xl"
       >
-        <h1 className="font-serif text-5xl font-light tracking-tighter md:text-7xl lg:text-8.5vw leading-[1.1]">
+        <h1 className="font-serif text-5xl font-light tracking-tighter text-zinc-900 dark:text-zinc-50 md:text-7xl lg:text-8.5vw leading-[1.1]">
           Espace. <br />
           Elite Venue Booking for Your Next Moment.
         </h1>
-        <p className="mx-auto mt-8 max-w-2xl text-lg text-zinc-500 dark:text-zinc-400 md:text-xl">
+        <p className="mx-auto mt-8 max-w-2xl text-lg text-zinc-600 dark:text-zinc-400 md:text-xl">
           Discover handpicked event spaces designed to elevate every occasion — from minimalist studios to grand atriums.
         </p>
 

@@ -9,8 +9,8 @@ export function VenueGrid() {
     <section className="mx-auto w-full max-w-7xl px-6 py-24">
       <div className="mb-16 flex items-end justify-between border-b-[0.5px] border-zinc-200 pb-4 dark:border-zinc-800">
         <div>
-          <h2 className="font-serif text-3xl font-light tracking-tighter md:text-5xl">Our Venues</h2>
-          <p className="mt-2 text-sm text-zinc-500 max-w-sm">
+          <h2 className="font-serif text-3xl font-light tracking-tighter text-zinc-900 dark:text-zinc-50 md:text-5xl">Our Venues</h2>
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400 max-w-sm">
             Carefully curated spaces for every kind of event, from creative studios to formal ballrooms.
           </p>
         </div>

@@ -14,17 +14,17 @@ export function Navbar() {
           <Link href="/" className="font-serif text-2xl font-bold tracking-tighter">
             ESPACE
           </Link>
-          <div className="hidden space-x-6 text-sm font-medium tracking-tight text-zinc-500 md:flex">
-            <Link href="/venues" className="hover:text-black dark:hover:text-white">Venues</Link>
-            <Link href="/about" className="hover:text-black dark:hover:text-white">About</Link>
-            <Link href="/contact" className="hover:text-black dark:hover:text-white">Contact</Link>
+          <div className="hidden space-x-6 text-sm font-medium tracking-tight text-zinc-500 dark:text-zinc-400 md:flex">
+            <Link href="/venues" className="transition-colors hover:text-zinc-900 dark:hover:text-zinc-100">Venues</Link>
+            <Link href="/about" className="transition-colors hover:text-zinc-900 dark:hover:text-zinc-100">About</Link>
+            <Link href="/contact" className="transition-colors hover:text-zinc-900 dark:hover:text-zinc-100">Contact</Link>
           </div>
         </div>
 
         <div className="flex items-center gap-4">
           <button
             onClick={() => setLang(lang === "EN" ? "BM" : "EN")}
-            className="flex h-8 w-12 items-center justify-center border-[0.5px] border-zinc-200 text-xs font-bold transition-colors hover:bg-zinc-100 dark:border-zinc-800 dark:hover:bg-zinc-900"
+            className="flex h-8 w-12 items-center justify-center border-[0.5px] border-zinc-200 text-xs font-bold text-zinc-600 transition-colors hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900"
           >
             {lang}
           </button>
