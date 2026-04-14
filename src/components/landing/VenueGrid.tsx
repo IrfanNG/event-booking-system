@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { venues } from "@/lib/mockData";
 import { motion } from "framer-motion";
+import { useLanguage } from "@/context/LanguageContext";
 
 export function VenueGrid() {
   const { t } = useLanguage();
