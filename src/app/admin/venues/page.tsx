@@ -1,21 +1,73 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useVenues } from "@/hooks/useVenues";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus, Edit, Trash2, AlertTriangle, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 export default function AdminVenues() {
   const { venues, loading, deleteVenue } = useVenues();
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete this venue? This action cannot be undone.")) {
-      await deleteVenue(id);
-    }
+  const venueToDelete = venues.find(v => v.id === deleteTarget);
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    await deleteVenue(deleteTarget);
+    setIsDeleting(false);
+    setDeleteTarget(null);
   };
 
   return (
     <div className="p-8">
+      {/* Custom Delete Modal */}
+      <AnimatePresence>
+        {deleteTarget && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm px-6">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="w-full max-w-md bg-white border-[0.5px] border-zinc-200 shadow-2xl"
+            >
+              <div className="p-8">
+                <div className="flex items-center gap-4 text-red-600 mb-6">
+                  <div className="bg-red-50 p-3">
+                    <AlertTriangle size={20} />
+                  </div>
+                  <h2 className="font-serif text-2xl tracking-tighter text-black">Confirm Deletion</h2>
+                </div>
+                
+                <p className="text-sm text-zinc-500 leading-relaxed">
+                  Are you sure you want to remove <span className="font-bold text-black uppercase">{venueToDelete?.name}</span>? 
+                  This action is permanent and will remove all associated booking data for this venue.
+                </p>
+
+                <div className="mt-10 flex gap-3">
+                  <button 
+                    onClick={() => setDeleteTarget(null)}
+                    disabled={isDeleting}
+                    className="flex-1 border-[0.5px] border-zinc-200 py-4 text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-black hover:bg-zinc-50 transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                    className="flex-1 bg-red-600 text-white py-4 text-[10px] font-bold uppercase tracking-widest hover:bg-red-700 transition-colors shadow-lg shadow-red-100 flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {isDeleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                    Delete Venue
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
       <div className="mb-12 flex items-end justify-between">
         <div>
           <h1 className="font-serif text-4xl font-light tracking-tighter text-black">Venue Management</h1>
@@ -77,7 +129,7 @@ export default function AdminVenues() {
                       <Edit className="h-4 w-4" />
                     </Link>
                     <button 
-                      onClick={() => handleDelete(v.id)}
+                      onClick={() => setDeleteTarget(v.id)}
                       className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 transition-colors"
                     >
                       <Trash2 className="h-4 w-4" />

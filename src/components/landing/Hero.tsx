@@ -9,7 +9,7 @@ export function Hero() {
   const { t } = useLanguage();
 
   return (
-    <section className="relative flex w-full flex-col items-center justify-center border-b-[0.5px] border-zinc-200 bg-white px-6 py-20 lg:py-32 text-center dark:border-zinc-800 dark:bg-black">
+    <section id="hero" className="relative flex w-full flex-col items-center justify-center border-b-[0.5px] border-zinc-200 bg-white px-6 py-20 lg:py-32 text-center dark:border-zinc-800 dark:bg-black">
       <motion.div
         initial={{ y: 20 }}
         animate={{ opacity: 1, y: 0 }}

@@ -1,11 +1,30 @@
 "use client";
 
+import { useEffect } from "react";
 import { Hero } from "@/components/landing/Hero";
 import { VenueGrid } from "@/components/landing/VenueGrid";
 import { useLanguage } from "@/context/LanguageContext";
 
 export default function Home() {
   const { t } = useLanguage();
+
+  useEffect(() => {
+    // Check if there is a hash in the URL (e.g., #venues)
+    const hash = window.location.hash;
+    if (hash) {
+      const element = document.getElementById(hash.substring(1));
+      if (element) {
+        // Delay slightly to ensure page is rendered
+        setTimeout(() => {
+          element.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+        return;
+      }
+    }
+    
+    // Fallback: Force scroll to top if no hash
+    window.scrollTo(0, 0);
+  }, []);
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -59,8 +78,8 @@ export default function Home() {
       <footer className="w-full bg-white py-12 border-t-[0.5px] border-zinc-200 px-6 text-center">
         <div className="mb-8 flex justify-center gap-8 text-[10px] font-bold uppercase tracking-widest text-zinc-400">
           <a href="#" className="hover:text-black transition-colors">Instagram</a>
-          <a href="#" className="hover:text-black transition-colors">LinkedIn</a>
-          <a href="#" className="hover:text-black transition-colors">Twitter</a>
+          <a href="#" className="hover:text-black transition-colors">TikTok</a>
+          <a href="#" className="hover:text-black transition-colors">X</a>
         </div>
         <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">
           ESPACE &copy; 2026. ALL RIGHTS RESERVED.

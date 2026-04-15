@@ -1,12 +1,11 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, ReactNode } from "react";
 
-type Language = "EN" | "BM";
+type Language = "EN";
 
 interface LanguageContextType {
   lang: Language;
-  setLang: (lang: Language) => void;
   t: (key: string) => string;
 }
 
@@ -93,101 +92,25 @@ export const translations = {
     success_title: "Booking Confirmed.",
     success_msg: "Your reservation for {name} has been received. Check your invite dashboard for details soon.",
     success_ref: "Reference ID",
-    success_btn: "Back to Dashboard"
-  },
-  BM: {
-    // Navbar
-    nav_venues: "Dewan",
-    nav_about: "Tentang",
-    nav_contact: "Hubungi",
-    btn_book_now: "Tempah Sekarang",
-    
-    // Hero
-    hero_title: "Tempahan Dewan Elit untuk Momen Seterusnya.",
-    hero_subtitle: "Temui ruang acara terpilih yang direka untuk meningkatkan setiap acara — dari studio minimalis ke atrium megah.",
-    btn_explore: "Terokai Dewan",
-    btn_learn_more: "Ketahui Lanjut",
-    hero_curated: "Pilihan Terpilih",
-    hero_hospitality: "Hospitaliti Institusi",
-    
-    // About
-    about_title: "Ruang Terpilih untuk Momen Ikonik.",
-    about_p1: "ESPACE adalah koleksi dewan acara mewah yang direka untuk mereka yang menghargai ketepatan estetik dan kecemerlangan fungsional. Dari galeri minimalis ke lot industri, setiap ruang dalam portfolio kami dipilih dengan teliti.",
-    about_p2: "Misi kami adalah untuk memudahkan pengalaman tempahan tanpa menjejaskan kualiti institusi yang dituntut oleh perancang acara profesional.",
-    
-    // Contact
-    contact_title: "Hubungi Kami",
-    contact_subtitle: "Berhubung dengan kurator dewan kami",
-    contact_email: "Emel",
-    contact_location: "Lokasi",
-    contact_phone: "Telefon",
-    
-    // Venue Grid
-    grid_title: "Dewan Kami",
-    grid_subtitle: "Ruang yang dikurasi dengan teliti untuk setiap jenis acara, dari studio kreatif ke dewan tari rasmi.",
-    grid_all: "Semua Dewan",
-    grid_filtered: "Paparan Terapis",
-    
-    // Venue Details
-    details_back: "Utama",
-    details_about: "Mengenai ruang ini",
-    details_amenities: "Kemudahan",
-    details_verified: "Ruang Disahkan",
-    details_guests: "Sehingga {count} tetamu",
-    details_reviews: "({count} Ulasan)",
-    
-    // Sidebar
-    sidebar_date: "Tarikh",
-    sidebar_select_date: "Pilih Tarikh",
-    sidebar_guests: "Tetamu",
-    sidebar_reserve: "Tempah Sekarang",
-    sidebar_confirming: "Mengesahkan...",
-    sidebar_service_note: "Jumlah termasuk 10% perjanjian servis",
-    sidebar_base: "Harga Asas",
-    sidebar_fee: "Yuran Servis (10%)",
-    sidebar_total: "Jumlah",
-    sidebar_day: "/ Hari",
-    sidebar_min_guests: "Min 1 tetamu",
-    sidebar_max_guests: "Maks {count} tetamu",
-    sidebar_timeslot: "Slot Masa",
-    sidebar_name: "Nama Penuh",
-    sidebar_email: "Alamat Emel",
-    sidebar_phone: "No. Telefon",
-    slot_full: "Sepanjang Hari (8PG - 10MLM)",
-    slot_morning: "Pagi (8PG - 1PTG)",
-    slot_evening: "Petang/Malam (2PTG - 10MLM)",
+    success_btn: "Back to Dashboard",
 
-    // Validation
-    val_required: "Ruangan ini wajib diisi",
-    val_invalid_email: "Sila masukkan emel yang sah",
-
-    // Confirmation
-    confirm_title: "Sahkan Tempahan Anda",
-    confirm_summary: "Semak butiran sebelum pengesahan akhir.",
-    confirm_venue: "Dewan",
-    confirm_date: "Tarikh Tempahan",
-    confirm_time: "Slot Masa",
-    confirm_guest_count: "Bil. Tetamu",
-    confirm_back: "Kembali",
-    confirm_final: "Sahkan Tempahan",
-    
-    // Success
-    success_title: "Tempahan Disahkan.",
-    success_msg: "Tempahan anda untuk {name} telah diterima. Semak papan pemuka jemputan anda untuk butiran lanjut.",
-    success_ref: "ID Rujukan",
-    success_btn: "Kembali ke Papan Pemuka"
+    // Categories
+    cat_hall: "Hall",
+    cat_studio: "Studio",
+    cat_outdoor: "Outdoor",
+    cat_office: "Office"
   }
 }
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [lang, setLang] = useState<Language>("EN");
+  const lang: Language = "EN";
 
   const t = (key: string) => {
     return (translations[lang] as any)[key] || key;
   };
 
   return (
-    <LanguageContext.Provider value={{ lang, setLang, t }}>
+    <LanguageContext.Provider value={{ lang, t }}>
       {children}
     </LanguageContext.Provider>
   );
@@ -200,3 +123,4 @@ export function useLanguage() {
   }
   return context;
 }
+

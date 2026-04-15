@@ -20,7 +20,11 @@ export default function VenueDetails() {
   const { id } = useParams();
   const { venues, loading: venuesLoading } = useVenues();
   const venue = venues.find((v) => v.id === id);
-  const { lang, setLang, t } = useLanguage();
+  const { t } = useLanguage();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
   
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [guestCount, setGuestCount] = useState(1);
@@ -134,6 +138,11 @@ export default function VenueDetails() {
     return t("slot_evening");
   };
 
+  const venueName = venue.name;
+  const venueLocation = venue.location;
+  const venueDescription = venue.description;
+  const venueAmenities = venue.amenities;
+
   return (
     <div className="flex min-h-screen flex-col bg-white text-black">
       <main className="mx-auto w-full max-w-7xl px-6 py-12">
@@ -164,7 +173,7 @@ export default function VenueDetails() {
                 <div className="space-y-6 mb-12">
                   <div className="flex justify-between border-b border-zinc-100 pb-2">
                     <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">{t("confirm_venue")}</span>
-                    <span className="text-sm font-bold">{venue.name}</span>
+                    <span className="text-sm font-bold">{venueName}</span>
                   </div>
                   <div className="flex justify-between border-b border-zinc-100 pb-2">
                     <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">{t("confirm_date")}</span>
@@ -242,7 +251,7 @@ export default function VenueDetails() {
                   </div>
                 </div>
                 <p className="text-sm text-zinc-600 leading-relaxed mb-12">
-                  {t("success_msg").replace("{name}", venue.name)}
+                  {t("success_msg").replace("{name}", venueName)}
                 </p>
                 <Link href="/">
                   <button className="w-full bg-black py-4 text-xs font-bold uppercase tracking-widest text-white transition-opacity hover:opacity-90">
@@ -260,7 +269,7 @@ export default function VenueDetails() {
             <ArrowLeft className="h-3 w-3" /> {t("details_back")}
           </Link>
           <span className="mx-2">/</span>
-          <span className="text-black">{venue.name}</span>
+          <span className="text-black">{venueName}</span>
         </nav>
 
         <div className="grid gap-12 lg:grid-cols-3">
@@ -273,7 +282,7 @@ export default function VenueDetails() {
             >
               <Image
                 src={venue.image}
-                alt={venue.name}
+                alt={venueName}
                 fill
                 className="object-cover"
                 priority
@@ -284,7 +293,7 @@ export default function VenueDetails() {
             <div className="mt-12 text-black">
               <div className="flex items-center justify-between">
                 <h1 className="font-serif text-4xl font-light tracking-tighter md:text-6xl">
-                  {venue.name}
+                  {venueName}
                 </h1>
                 <div className="flex items-center gap-1 text-sm font-bold">
                   <Star className="h-4 w-4 fill-black" />
@@ -296,7 +305,7 @@ export default function VenueDetails() {
               <div className="mt-6 flex flex-wrap gap-6 text-sm font-medium text-zinc-500">
                 <div className="flex items-center gap-2">
                   <MapPin className="h-4 w-4" />
-                  {venue.location}
+                  {venueLocation}
                 </div>
                 <div className="flex items-center gap-2">
                   <Users className="h-4 w-4" />
@@ -311,20 +320,16 @@ export default function VenueDetails() {
               <div className="mt-12 h-[0.5px] w-full bg-zinc-100" />
 
               <div className="mt-12">
-                <h2 className="font-serif text-2xl tracking-tight uppercase text-zinc-400 text-xs font-bold tracking-[0.2em] mb-4">Mengenai Ruang</h2>
                 <h2 className="font-serif text-3xl tracking-tight mb-6">{t("details_about")}</h2>
                 <p className="text-base leading-relaxed text-zinc-600 max-w-2xl">
-                  {venue.description}
-                  {" "}This premium venue offers state-of-the-art facilities designed for high-end events. 
-                  Whether you're hosting a corporate seminar, an intimate celebration, or a creative workshop, 
-                  our space adapts to your vision with seamless institutional hospitality.
+                  {venueDescription}
                 </p>
               </div>
 
               <div className="mt-12">
                 <h2 className="font-serif text-3xl tracking-tight mb-6">{t("details_amenities")}</h2>
                 <div className="grid grid-cols-2 gap-y-4 gap-x-12">
-                  {venue.amenities.map((item) => (
+                  {venueAmenities.map((item) => (
                     <div key={item} className="flex items-center gap-3 text-sm text-zinc-600 pb-3 border-b border-zinc-50">
                       <Check className="h-4 w-4 text-zinc-900" />
                       {item}

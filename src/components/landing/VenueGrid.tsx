@@ -18,6 +18,10 @@ export function VenueGrid() {
     ? venues.filter(v => v.category === selectedCategory)
     : venues;
 
+  const getCategoryLabel = (cat: string) => {
+    return t(`cat_${cat.toLowerCase()}`);
+  };
+
   if (loading) {
     return (
       <section id="venues" className="w-full bg-white px-6 py-16 lg:py-24">
@@ -64,7 +68,7 @@ export function VenueGrid() {
                   selectedCategory === cat ? 'text-black border-b-[1px] border-black pb-1' : 'text-zinc-400 hover:text-black'
                 }`}
               >
-                {cat}s
+                {getCategoryLabel(cat)}
               </button>
             ))}
           </div>
@@ -90,22 +94,25 @@ export function VenueGrid() {
                     className="object-cover transition-transform duration-700 group-hover:scale-110"
                   />
                   <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-md px-3 py-1 text-[10px] font-bold uppercase tracking-widest border-[0.5px] border-zinc-200 text-black">
-                    {venue.category}
+                    {getCategoryLabel(venue.category)}
                   </div>
                 </div>
 
                 <div className="mt-6 flex justify-between items-start">
                   <div>
-                    <h3 className="font-serif text-xl tracking-tight text-black">{venue.name}</h3>
-                    <p className="mt-1 text-xs text-zinc-500 uppercase tracking-widest font-bold">{venue.location}</p>
+                    <h3 className="font-serif text-xl tracking-tight text-black">
+                      {venue.name}
+                    </h3>
+                    <p className="mt-1 text-xs text-zinc-500 uppercase tracking-widest font-bold">
+                      {venue.location}
+                    </p>
                   </div>
                   <p className="text-sm font-bold tracking-tight text-black">RM {venue.price?.toLocaleString()}</p>
                 </div>
-                
+
                 <p className="mt-3 text-sm text-zinc-600 line-clamp-2 leading-relaxed tracking-tight">
                   {venue.description}
                 </p>
-
                 <div className="mt-6 flex flex-wrap gap-2">
                   {venue.amenities?.slice(0, 3).map((amenity) => (
                     <span

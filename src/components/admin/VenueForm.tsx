@@ -58,7 +58,7 @@ export function VenueForm({ initialData, onSubmit, title }: VenueFormProps) {
   };
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-8 max-w-6xl mx-auto">
       <div className="mb-12 flex items-center justify-between">
         <div className="flex items-center gap-6">
           <Link 
@@ -71,25 +71,72 @@ export function VenueForm({ initialData, onSubmit, title }: VenueFormProps) {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-12 font-sans">
-        {/* Basic Info */}
+      <form onSubmit={handleSubmit} className="space-y-16 font-sans">
+        {/* Core Specifications */}
+        <div className="space-y-8">
+          <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 border-b-[0.5px] border-zinc-200 pb-2">Venue Details</h2>
+          
+          <div className="grid gap-8 lg:grid-cols-2">
+            <FormField label="Venue Name">
+              <input
+                required
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full bg-zinc-50 border-[0.5px] border-zinc-200 p-4 text-xs font-medium focus:outline-none focus:border-black transition-colors"
+                placeholder="e.g., The Grand Atrium"
+              />
+            </FormField>
+
+            <FormField label="Location">
+              <input
+                required
+                type="text"
+                value={formData.location}
+                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                className="w-full bg-zinc-50 border-[0.5px] border-zinc-200 p-4 text-xs font-medium focus:outline-none focus:border-black transition-colors"
+                placeholder="e.g., Bangsar South, KL"
+              />
+            </FormField>
+          </div>
+
+          <FormField label="Description">
+            <textarea
+              required
+              rows={4}
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              className="w-full bg-zinc-50 border-[0.5px] border-zinc-200 p-4 text-xs font-medium focus:outline-none focus:border-black transition-colors resize-none"
+              placeholder="Describe the space..."
+            />
+          </FormField>
+        </div>
+
+        {/* Global Settings */}
         <div className="grid gap-12 lg:grid-cols-2">
           <div className="space-y-8">
-            <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 border-b-[0.5px] border-zinc-200 pb-2">Core Specifications</h2>
-            
-            <div className="space-y-6">
-              <FormField label="Venue Name">
+            <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 border-b-[0.5px] border-zinc-200 pb-2">Capacity & Pricing</h2>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField label="Capacity (Pax)">
                 <input
                   required
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  type="number"
+                  value={formData.capacity}
+                  onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) })}
                   className="w-full bg-zinc-50 border-[0.5px] border-zinc-200 p-4 text-xs font-medium focus:outline-none focus:border-black transition-colors"
-                  placeholder="e.g., The Grand Atrium"
                 />
               </FormField>
-
-              <FormField label="Category">
+              <FormField label="Base Price (RM)">
+                <input
+                  required
+                  type="number"
+                  value={formData.price}
+                  onChange={(e) => setFormData({ ...formData, price: parseInt(e.target.value) })}
+                  className="w-full bg-zinc-50 border-[0.5px] border-zinc-200 p-4 text-xs font-medium focus:outline-none focus:border-black transition-colors"
+                />
+              </FormField>
+            </div>
+            <FormField label="Category">
                 <select
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
@@ -101,110 +148,49 @@ export function VenueForm({ initialData, onSubmit, title }: VenueFormProps) {
                   <option value="Office">Office</option>
                 </select>
               </FormField>
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField label="Capacity (Pax)">
-                  <input
-                    required
-                    type="number"
-                    value={formData.capacity}
-                    onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) })}
-                    className="w-full bg-zinc-50 border-[0.5px] border-zinc-200 p-4 text-xs font-medium focus:outline-none focus:border-black transition-colors"
-                  />
-                </FormField>
-                <FormField label="Base Price (RM)">
-                  <input
-                    required
-                    type="number"
-                    value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: parseInt(e.target.value) })}
-                    className="w-full bg-zinc-50 border-[0.5px] border-zinc-200 p-4 text-xs font-medium focus:outline-none focus:border-black transition-colors"
-                  />
-                </FormField>
-              </div>
-
-              <FormField label="Location">
-                <input
-                  required
-                  type="text"
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  className="w-full bg-zinc-50 border-[0.5px] border-zinc-200 p-4 text-xs font-medium focus:outline-none focus:border-black transition-colors"
-                  placeholder="e.g., Bangsar South, KL"
-                />
-              </FormField>
-            </div>
           </div>
 
           <div className="space-y-8">
-            <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 border-b-[0.5px] border-zinc-200 pb-2">Visuals & Details</h2>
-            
-            <div className="space-y-6">
-              <FormField label="Cover Image URL">
-                <input
-                  required
-                  type="url"
-                  value={formData.image}
-                  onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                  className="w-full bg-zinc-50 border-[0.5px] border-zinc-200 p-4 text-xs font-medium focus:outline-none focus:border-black transition-colors"
-                  placeholder="https://images.unsplash.com/..."
-                />
-              </FormField>
-
-              {formData.image && (
-                <div className="aspect-video bg-zinc-100 border-[0.5px] border-zinc-200 overflow-hidden">
-                  <img src={formData.image} alt="Preview" className="h-full w-full object-cover" />
-                </div>
-              )}
-
-              <FormField label="Description">
-                <textarea
-                  required
-                  rows={4}
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full bg-zinc-50 border-[0.5px] border-zinc-200 p-4 text-xs font-medium focus:outline-none focus:border-black transition-colors resize-none"
-                  placeholder="Describe the unique characteristics of this space..."
-                />
-              </FormField>
-            </div>
+            <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 border-b-[0.5px] border-zinc-200 pb-2">Visuals</h2>
+            <FormField label="Cover Image URL">
+              <input
+                required
+                type="url"
+                value={formData.image}
+                onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                className="w-full bg-zinc-50 border-[0.5px] border-zinc-200 p-4 text-xs font-medium focus:outline-none focus:border-black transition-colors"
+                placeholder="https://images.unsplash.com/..."
+              />
+            </FormField>
+            {formData.image && (
+              <div className="aspect-video bg-zinc-100 border-[0.5px] border-zinc-200 overflow-hidden">
+                <img src={formData.image} alt="Preview" className="h-full w-full object-cover" />
+              </div>
+            )}
           </div>
         </div>
 
         {/* Amenities */}
         <div className="space-y-8">
-          <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 border-b-[0.5px] border-zinc-200 pb-2">Amenities & Features</h2>
-          
+          <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 border-b-[0.5px] border-zinc-200 pb-2">Amenities</h2>
           <div className="flex flex-wrap gap-2 mb-4">
             {formData.amenities.map((amenity, index) => (
-              <span 
-                key={index}
-                className="flex items-center gap-2 bg-white border-[0.5px] border-zinc-200 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-black"
-              >
+              <span key={index} className="flex items-center gap-2 bg-white border-[0.5px] border-zinc-200 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-black">
                 {amenity}
-                <button type="button" onClick={() => removeAmenity(index)} className="text-zinc-400 hover:text-red-500">
-                  <X className="h-3 w-3" />
-                </button>
+                <button type="button" onClick={() => removeAmenity(index)} className="text-zinc-400 hover:text-red-500"><X size={12} /></button>
               </span>
             ))}
           </div>
-
-          <div className="flex gap-2">
+          <div className="flex gap-2 max-w-md">
             <input
               type="text"
               value={newAmenity}
               onChange={(e) => setNewAmenity(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addAmenity())}
               className="flex-1 bg-zinc-50 border-[0.5px] border-zinc-200 p-4 text-xs font-medium focus:outline-none focus:border-black transition-colors"
-              placeholder="Add amenity (e.g., WIFI, Stage, Parking)..."
+              placeholder="Add amenity..."
             />
-            <button
-              type="button"
-              onClick={addAmenity}
-              className="bg-zinc-100 border-[0.5px] border-zinc-200 px-6 text-[10px] font-bold uppercase tracking-widest hover:bg-zinc-200 transition-colors"
-            >
-              Add
-            </button>
+            <button type="button" onClick={addAmenity} className="bg-zinc-100 border-[0.5px] border-zinc-200 px-6 text-[10px] font-bold uppercase tracking-widest hover:bg-zinc-200">Add</button>
           </div>
         </div>
 
