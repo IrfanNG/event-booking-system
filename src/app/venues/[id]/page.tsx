@@ -265,7 +265,7 @@ export default function VenueDetails() {
 
         {/* Breadcrumbs */}
         <nav className="mb-8 flex text-[10px] font-bold uppercase tracking-widest text-zinc-400">
-          <Link href="/" className="flex items-center gap-1 hover:text-black">
+          <Link href="/#venues" className="flex items-center gap-1 hover:text-black">
             <ArrowLeft className="h-3 w-3" /> {t("details_back")}
           </Link>
           <span className="mx-2">/</span>
@@ -291,14 +291,16 @@ export default function VenueDetails() {
 
             {/* Content info */}
             <div className="mt-12 text-black">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <h1 className="font-serif text-4xl font-light tracking-tighter md:text-6xl">
                   {venueName}
                 </h1>
-                <div className="flex items-center gap-1 text-sm font-bold">
-                  <Star className="h-4 w-4 fill-black" />
-                  <span>4.9</span>
-                  <span className="text-zinc-400">{t("details_reviews").replace("{count}", "24")}</span>
+                <div className="flex items-center justify-between lg:justify-end w-full lg:w-auto">
+                  <div className="flex items-center gap-1 text-sm font-bold">
+                    <Star className="h-4 w-4 fill-black" />
+                    <span>4.9</span>
+                    <span className="text-zinc-400">{t("details_reviews").replace("{count}", "24")}</span>
+                  </div>
                 </div>
               </div>
 
@@ -341,7 +343,7 @@ export default function VenueDetails() {
           </div>
 
           {/* Right Column: Sticky Sidebar */}
-          <div className="relative">
+          <div className="relative" id="booking-sidebar">
             <div className="sticky top-28 border-[0.5px] border-zinc-200 bg-white p-8 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.05)]">
               <div className="flex items-end justify-between mb-8">
                 <div>
@@ -520,11 +522,29 @@ export default function VenueDetails() {
         </div>
       </main>
 
-      <footer className="mt-24 border-t-[0.5px] border-zinc-200 bg-white py-12 px-6 text-center">
+      <footer className="mt-24 border-t-[0.5px] border-zinc-200 bg-white py-12 px-6 text-center mb-24 lg:mb-0">
         <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">
           ESPACE &copy; 2026. ALL RIGHTS RESERVED.
         </p>
       </footer>
+
+      {/* Sticky Mobile Booking Bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 border-t-[0.5px] border-zinc-200 bg-white/95 backdrop-blur-md px-6 py-4 lg:hidden shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+        <div className="flex items-center justify-between max-w-7xl mx-auto">
+          <div>
+            <span className="text-xl font-bold text-black font-serif">RM {(venue.price * getPriceFactor()).toLocaleString()}</span>
+            <span className="ml-1 text-[10px] font-bold uppercase tracking-widest text-zinc-400">{t("sidebar_day")}</span>
+          </div>
+          <button 
+            onClick={() => {
+              document.getElementById("booking-sidebar")?.scrollIntoView({ behavior: "smooth" });
+            }}
+            className="bg-black text-white px-8 py-4 text-[10px] font-bold uppercase tracking-widest transition-opacity hover:opacity-90 active:scale-95 transition-transform"
+          >
+            {t("sidebar_reserve")}
+          </button>
+        </div>
+      </div>
 
       <style jsx global>{`
         .custom-calendar .rdp {
