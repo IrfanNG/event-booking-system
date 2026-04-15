@@ -2,12 +2,31 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { venues } from "@/lib/mockData";
+import { useVenues } from "@/hooks/useVenues";
 import { motion } from "framer-motion";
 import { useLanguage } from "@/context/LanguageContext";
 
 export function VenueGrid() {
   const { t } = useLanguage();
+  const { venues, loading } = useVenues();
+
+  if (loading) {
+    return (
+      <section id="venues" className="w-full bg-white px-6 py-16 lg:py-24">
+        <div className="mx-auto max-w-7xl">
+          <div className="grid gap-12 sm:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="animate-pulse space-y-4">
+                <div className="aspect-[4/5] bg-zinc-100 border-[0.5px] border-zinc-200" />
+                <div className="h-4 w-2/3 bg-zinc-50" />
+                <div className="h-4 w-1/2 bg-zinc-50" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section id="venues" className="w-full bg-white px-6 py-16 lg:py-24">
@@ -33,7 +52,7 @@ export function VenueGrid() {
         {venues.map((venue, idx) => (
           <Link key={venue.id} href={`/venues/${venue.id}`}>
             <motion.div
-              initial={{ y: 20 }}
+              initial={{ y: 20, opacity: 0 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.1 }}
               className="group block cursor-pointer"
@@ -45,7 +64,7 @@ export function VenueGrid() {
                   fill
                   className="object-cover transition-transform duration-700 group-hover:scale-110"
                 />
-                <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-md px-3 py-1 text-[10px] font-bold uppercase tracking-widest thin-border text-black">
+                <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-md px-3 py-1 text-[10px] font-bold uppercase tracking-widest border-[0.5px] border-zinc-200 text-black">
                   {venue.category}
                 </div>
               </div>
@@ -55,7 +74,7 @@ export function VenueGrid() {
                   <h3 className="font-serif text-xl tracking-tight text-black">{venue.name}</h3>
                   <p className="mt-1 text-xs text-zinc-500 uppercase tracking-widest font-bold">{venue.location}</p>
                 </div>
-                <p className="text-sm font-bold tracking-tight text-black">RM {venue.price}</p>
+                <p className="text-sm font-bold tracking-tight text-black">RM {venue.price?.toLocaleString()}</p>
               </div>
               
               <p className="mt-3 text-sm text-zinc-600 line-clamp-2 leading-relaxed tracking-tight">
@@ -63,7 +82,7 @@ export function VenueGrid() {
               </p>
 
               <div className="mt-6 flex flex-wrap gap-2">
-                {venue.amenities.slice(0, 3).map((amenity) => (
+                {venue.amenities?.slice(0, 3).map((amenity) => (
                   <span
                     key={amenity}
                     className="rounded-full border-[0.5px] border-zinc-200 px-3 py-1 text-[10px] font-medium text-zinc-500 transition-colors hover:border-black hover:text-black"

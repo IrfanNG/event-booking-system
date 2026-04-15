@@ -10,6 +10,7 @@ const navItems = [
   { icon: <CalendarDays className="h-4 w-4" />, label: "Bookings", href: "/admin/bookings" },
   { icon: <Users className="h-4 w-4" />, label: "Customers", href: "/admin/customers" },
   { icon: <Wallet className="h-4 w-4" />, label: "Finance", href: "/admin/finance" },
+  { icon: <CalendarDays className="h-4 w-4" />, label: "Venues", href: "/admin/venues" },
 ];
 
 export function AdminSidebar() {
