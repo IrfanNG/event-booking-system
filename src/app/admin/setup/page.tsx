@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { venues } from "@/lib/mockData";
 import { motion } from "framer-motion";
-import { ShieldAlert, CheckCircle, Loader2, Database } from "lucide-react";
+import { ShieldAlert, CheckCircle, Loader2, Database, AlertCircle } from "lucide-react";
 
 export default function AdminSetup() {
   const [loading, setLoading] = useState(false);
@@ -32,6 +32,15 @@ export default function AdminSetup() {
     setSeedLoading(true);
     setError(null);
     try {
+      // Ensure we are authenticated as admin before seeding
+      if (!auth.currentUser) {
+        try {
+          await signInWithEmailAndPassword(auth, "admin@espace.com", "admin123");
+        } catch (authErr) {
+          throw new Error("Admin authentication failed. Please 'Create Admin Account' first or login manually.");
+        }
+      }
+
       for (const venue of venues) {
         const { id, ...venueData } = venue;
         await addDoc(collection(db, "venues"), {
@@ -41,7 +50,12 @@ export default function AdminSetup() {
       }
       setSeedDone(true);
     } catch (err: any) {
-      setError(err.message);
+      console.error("Seed Error:", err);
+      if (err.code === "permission-denied") {
+        setError("Firebase Permission Denied. Ensure your Firestore Rules allow 'write' for authenticated users.");
+      } else {
+        setError(err.message);
+      }
     } finally {
       setSeedLoading(false);
     }
