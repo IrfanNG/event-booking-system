@@ -26,6 +26,7 @@ export function Navbar() {
     { href: "/#venues", label: t("nav_venues") },
     { href: "/#about", label: t("nav_about") },
     { href: "/#contact", label: t("nav_contact") },
+    { href: "/track", label: "Track Booking" },
   ];
 
   return (

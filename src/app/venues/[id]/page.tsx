@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { useVenues } from "@/hooks/useVenues";
+import { useBookings } from "@/hooks/useBookings";
 import { motion, AnimatePresence } from "framer-motion";
 import { MapPin, Users, Shield, Star, Check, Calendar, ArrowLeft, PartyPopper, Plus, Minus, X, Loader2 } from "lucide-react";
 import { DayPicker } from "react-day-picker";
@@ -19,7 +20,9 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 export default function VenueDetails() {
   const { id } = useParams();
   const { venues, loading: venuesLoading } = useVenues();
+  const { getVenueBookings } = useBookings();
   const venue = venues.find((v) => v.id === id);
+  const venueBookings = getVenueBookings(id as string);
   const { t } = useLanguage();
 
   useEffect(() => {
@@ -38,6 +41,49 @@ export default function VenueDetails() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const calendarRef = useRef<HTMLDivElement>(null);
+
+  // Collision detection logic
+  const getActiveBookingsForDate = (date: Date) => {
+    return venueBookings
+      .filter(b => {
+        // Only block if status is pending or approved
+        if (b.status === "rejected") return false;
+        
+        const bDate = b.date?.toDate ? b.date.toDate() : new Date(b.date);
+        return format(bDate, "yyyy-MM-dd") === format(date, "yyyy-MM-dd");
+      });
+  };
+
+  const getBookedSlotsForDate = (date: Date) => {
+    return getActiveBookingsForDate(date).map(b => b.timeSlot);
+  };
+
+  const isSlotUnavailable = (date: Date, slot: string) => {
+    const activeBookings = getActiveBookingsForDate(date);
+    const bookedSlots = activeBookings.map(b => b.timeSlot);
+    
+    // If there's a "full" booking, everything is blocked
+    if (bookedSlots.includes("full")) return true;
+    
+    // If current slot being checked is "full", but there's already ANY booking, block it
+    if (slot === "full" && bookedSlots.length > 0) return true;
+    
+    // Otherwise check specific slot
+    return bookedSlots.includes(slot);
+  };
+
+  const disabledDays = [
+    { before: addDays(new Date(), 2) }, // Allow booking from 2 days ahead
+    ...venueBookings
+      .filter(b => {
+        if (b.status === "rejected") return false;
+        const date = b.date?.toDate ? b.date.toDate() : new Date(b.date);
+        const booked = getBookedSlotsForDate(date);
+        // Block full day in calendar if "full" is booked or both morning & evening are booked
+        return booked.includes("full") || (booked.includes("morning") && booked.includes("evening"));
+      })
+      .map(b => b.date?.toDate ? b.date.toDate() : new Date(b.date))
+  ];
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -102,9 +148,9 @@ export default function VenueDetails() {
     const ref = generateRefId();
     setBookingRef(ref);
 
-    // 10-second timeout to prevent infinite loading on network block
+    // 10-second timeout
     const timeout = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error("Request timed out. Please disable any AdBlockers or check your connection.")), 10000)
+      setTimeout(() => reject(new Error("Request timed out.")), 10000)
     );
 
     try {
@@ -127,7 +173,7 @@ export default function VenueDetails() {
       setBookingStep("success");
     } catch (error: any) {
       console.error("Booking Error:", error);
-      alert(error.message || "Failed to save booking. Please try again.");
+      alert(error.message || "Failed to save booking.");
       setBookingStep("idle");
     }
   };
@@ -380,8 +426,12 @@ export default function VenueDetails() {
                           onSelect={(date) => {
                             setSelectedDate(date);
                             setShowCalendar(false);
+                            // Reset slot if it becomes unavailable
+                            if (date && isSlotUnavailable(date, selectedTimeSlot)) {
+                              setSelectedTimeSlot("morning");
+                            }
                           }}
-                          disabled={{ before: addDays(new Date(), 3) }}
+                          disabled={disabledDays}
                         />
                       </motion.div>
                     )}
@@ -396,9 +446,15 @@ export default function VenueDetails() {
                     onChange={(e) => setSelectedTimeSlot(e.target.value as any)}
                     className="w-full text-sm font-medium text-black bg-transparent border-none focus:ring-0 p-0 cursor-pointer appearance-none"
                   >
-                    <option value="full">{t("slot_full")}</option>
-                    <option value="morning">{t("slot_morning")}</option>
-                    <option value="evening">{t("slot_evening")}</option>
+                    <option value="full" disabled={selectedDate && isSlotUnavailable(selectedDate, "full")}>
+                      {t("slot_full")} {selectedDate && isSlotUnavailable(selectedDate, "full") ? "— (Booked)" : ""}
+                    </option>
+                    <option value="morning" disabled={selectedDate && isSlotUnavailable(selectedDate, "morning")}>
+                      {t("slot_morning")} {selectedDate && isSlotUnavailable(selectedDate, "morning") ? "— (Booked)" : ""}
+                    </option>
+                    <option value="evening" disabled={selectedDate && isSlotUnavailable(selectedDate, "evening")}>
+                      {t("slot_evening")} {selectedDate && isSlotUnavailable(selectedDate, "evening") ? "— (Booked)" : ""}
+                    </option>
                   </select>
                 </div>
 
@@ -529,7 +585,7 @@ export default function VenueDetails() {
       </footer>
 
       {/* Sticky Mobile Booking Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 border-t-[0.5px] border-zinc-200 bg-white/95 backdrop-blur-md px-6 py-4 lg:hidden shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+      <div className="fixed bottom-0 left-0 right-0 z-[100] border-t-[0.5px] border-zinc-200 bg-white/95 backdrop-blur-md px-6 py-4 lg:hidden shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div>
             <span className="text-xl font-bold text-black font-serif">RM {(venue.price * getPriceFactor()).toLocaleString()}</span>

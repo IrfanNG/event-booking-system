@@ -37,6 +37,17 @@ export function useBookings() {
     }
   };
 
+  const getVenueBookings = (venueId: string) => {
+    return bookings.filter(b => b.venueId === venueId && (b.status === "approved" || b.status === "pending"));
+  };
+
+  const getUserBookings = (email: string, phone: string) => {
+    return bookings.filter(b => 
+      b.customerEmail.toLowerCase() === email.toLowerCase() && 
+      b.customerPhone.replace(/[^0-9]/g, "") === phone.replace(/[^0-9]/g, "")
+    );
+  };
+
   const stats = {
     total: bookings.length,
     revenue: bookings.filter(b => b.status === 'approved').reduce((acc, b) => acc + (b.totalPrice || 0), 0),
@@ -44,5 +55,5 @@ export function useBookings() {
     rejected: bookings.filter(b => b.status === 'rejected').length
   };
 
-  return { bookings, loading, stats, updateStatus };
+  return { bookings, loading, stats, updateStatus, getVenueBookings, getUserBookings };
 }
