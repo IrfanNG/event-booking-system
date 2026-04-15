@@ -4,10 +4,9 @@ import { useState, useRef, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { venues } from "@/lib/mockData";
-import { Navbar } from "@/components/landing/Navbar";
+import { useVenues } from "@/hooks/useVenues";
 import { motion, AnimatePresence } from "framer-motion";
-import { MapPin, Users, Shield, Star, Check, Calendar, ArrowLeft, PartyPopper, Plus, Minus, X } from "lucide-react";
+import { MapPin, Users, Shield, Star, Check, Calendar, ArrowLeft, PartyPopper, Plus, Minus, X, Loader2 } from "lucide-react";
 import { DayPicker } from "react-day-picker";
 import { format, addDays } from "date-fns";
 import "react-day-picker/dist/style.css";
@@ -19,6 +18,7 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 export default function VenueDetails() {
   const { id } = useParams();
+  const { venues, loading: venuesLoading } = useVenues();
   const venue = venues.find((v) => v.id === id);
   const { lang, setLang, t } = useLanguage();
   
@@ -45,11 +45,19 @@ export default function VenueDetails() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  if (venuesLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white">
+        <Loader2 className="h-12 w-12 animate-spin text-zinc-200" />
+      </div>
+    );
+  }
+
   if (!venue) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-white text-black">
         <h1 className="font-serif text-4xl">Venue Not Found</h1>
-        <Link href="/" className="mt-4 text-zinc-500 hover:underline">{t("details_back")}</Link>
+        <Link href="/" className="mt-4 text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-black transition-colors">{t("details_back")}</Link>
       </div>
     );
   }
