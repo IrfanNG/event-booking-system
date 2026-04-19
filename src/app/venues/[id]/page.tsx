@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -15,7 +15,7 @@ import "react-day-picker/dist/style.css";
 import { useLanguage } from "@/context/LanguageContext";
 
 import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, query, where, getDocs, Timestamp } from "firebase/firestore";
 
 export default function VenueDetails() {
   const { id } = useParams();
@@ -95,23 +95,6 @@ export default function VenueDetails() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  if (venuesLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-white">
-        <Loader2 className="h-12 w-12 animate-spin text-zinc-200" />
-      </div>
-    );
-  }
-
-  if (!venue) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-white text-black">
-        <h1 className="font-serif text-4xl">Venue Not Found</h1>
-        <Link href="/" className="mt-4 text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-black transition-colors">{t("details_back")}</Link>
-      </div>
-    );
-  }
-
   const validate = () => {
     const newErrors: Record<string, string> = {};
     if (!userData.name) newErrors.name = t("val_required");
@@ -128,23 +111,62 @@ export default function VenueDetails() {
   };
 
   const calculateTotal = () => {
+    if (!venue) return 0;
     const base = venue.price * getPriceFactor();
     const serviceFee = base * 0.1;
     return base + serviceFee;
   };
 
-  const generateRefId = () => {
-    const date = format(new Date(), "yyyyMMdd");
+  const generateRefId = useCallback(() => {
+    const dateStr = format(new Date(), "yyyyMMdd");
     const random = Math.floor(100 + Math.random() * 900);
-    return `#ES-${date}-${random}`;
-  };
+    return `#ES-${dateStr}-${random}`;
+  }, []);
 
   const handleStartBooking = () => {
     if (selectedDate && validate()) setBookingStep("confirm");
   };
 
   const handleFinalConfirm = async () => {
+    if (!venue || !selectedDate) return;
     setBookingStep("processing");
+
+    // DB-LEVEL HARD LOCK: Pre-flight collision check
+    try {
+      const q = query(
+        collection(db, "bookings"),
+        where("venueId", "==", venue.id),
+        where("status", "!=", "rejected")
+      );
+      
+      const snapshot = await getDocs(q);
+      const bookedSlots = snapshot.docs
+        .filter(doc => {
+          const data = doc.data();
+          // Safe date comparison
+          const bDate = data.date instanceof Timestamp ? data.date.toDate() : new Date(data.date);
+          return format(bDate, "yyyy-MM-dd") === format(selectedDate, "yyyy-MM-dd");
+        })
+        .map(doc => doc.data().timeSlot);
+
+      let isConflict = false;
+      if (bookedSlots.includes("full")) isConflict = true;
+      else if (selectedTimeSlot === "full" && bookedSlots.length > 0) isConflict = true;
+      else if (bookedSlots.includes(selectedTimeSlot)) isConflict = true;
+
+      if (isConflict) {
+        alert("Institutional Sync Fault: This slot was just reserved by another client. Please select an alternative time.");
+        setBookingStep("idle");
+        return;
+      }
+    } catch (err) {
+      console.error("Pre-flight Check Error:", err);
+      // Fail open or closed? Better to fail closed for integrity
+      alert("System integrity check failed. Please try again.");
+      setBookingStep("idle");
+      return;
+    }
+
     const ref = generateRefId();
     setBookingRef(ref);
 
@@ -171,12 +193,30 @@ export default function VenueDetails() {
 
       await Promise.race([bookingAction, timeout]);
       setBookingStep("success");
-    } catch (error: any) {
+    } catch (error) {
       console.error("Booking Error:", error);
-      alert(error.message || "Failed to save booking.");
+      const err = error as { message?: string };
+      alert(err.message || "Failed to save booking.");
       setBookingStep("idle");
     }
   };
+
+  if (venuesLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white">
+        <Loader2 className="h-12 w-12 animate-spin text-zinc-200" />
+      </div>
+    );
+  }
+
+  if (!venue) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-white text-black">
+        <h1 className="font-serif text-4xl">Venue Not Found</h1>
+        <Link href="/" className="mt-4 text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-black transition-colors">{t("details_back")}</Link>
+      </div>
+    );
+  }
 
   const getTimeSlotLabel = (slot: string) => {
     if (slot === "full") return t("slot_full");
@@ -443,7 +483,7 @@ export default function VenueDetails() {
                   <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 group-hover:text-black block mb-1">{t("sidebar_timeslot")}</label>
                   <select 
                     value={selectedTimeSlot}
-                    onChange={(e) => setSelectedTimeSlot(e.target.value as any)}
+                    onChange={(e) => setSelectedTimeSlot(e.target.value as "full" | "morning" | "evening")}
                     className="w-full text-sm font-medium text-black bg-transparent border-none focus:ring-0 p-0 cursor-pointer appearance-none"
                   >
                     <option value="full" disabled={selectedDate && isSlotUnavailable(selectedDate, "full")}>

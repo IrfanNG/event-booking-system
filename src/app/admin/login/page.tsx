@@ -22,8 +22,9 @@ export default function AdminLogin() {
     try {
       await login(identifier, password);
       router.push("/admin/dashboard");
-    } catch (err: any) {
-      console.error("Login Error:", err);
+    } catch (error) {
+      console.error("Login Error:", error);
+      const err = error as { code?: string };
       if (err.code === "auth/user-not-found" || err.code === "auth/wrong-password" || err.code === "auth/invalid-credential") {
         setError("Invalid credentials. Access denied.");
       } else {

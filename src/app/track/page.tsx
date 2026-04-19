@@ -2,19 +2,18 @@
 
 import { useState } from "react";
 import { useBookings } from "@/hooks/useBookings";
-import { useLanguage } from "@/context/LanguageContext";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Calendar, MapPin, Clock, ArrowRight, Loader2, Package, CheckCircle2, XCircle, Timer } from "lucide-react";
+import { Search, Calendar, Clock, ArrowRight, Loader2, Package, CheckCircle2, XCircle, Timer } from "lucide-react";
 import Link from "next/link";
 
 export default function TrackBookingPage() {
   const { bookings, loading } = useBookings();
-  const { t } = useLanguage();
   
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [filteredBookings, setFilteredBookings] = useState<any[]>([]);
 
   const handleSearch = (e: React.FormEvent) => {
@@ -173,7 +172,7 @@ export default function TrackBookingPage() {
                     <Search className="h-10 w-10 text-zinc-300" />
                   </div>
                   <h3 className="font-serif text-2xl tracking-tight mb-2">No Bookings Found</h3>
-                  <p className="text-sm text-zinc-500 max-w-xs">We couldn't find any bookings associated with that email and phone number.</p>
+                  <p className="text-sm text-zinc-500 max-w-xs">We couldn&apos;t find any bookings associated with that email and phone number.</p>
                   <Link href="/#venues" className="mt-8 text-xs font-bold uppercase tracking-widest border-b border-black pb-1 hover:text-zinc-500 transition-colors">
                     Explore Venues
                   </Link>

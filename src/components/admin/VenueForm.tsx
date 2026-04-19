@@ -8,7 +8,7 @@ import Link from "next/link";
 
 interface VenueFormProps {
   initialData?: Venue;
-  onSubmit: (data: Omit<Venue, "id">) => Promise<{ success: boolean; error?: any }>;
+  onSubmit: (data: Omit<Venue, "id">) => Promise<{ success: boolean; error?: unknown }>;
   title: string;
 }
 
@@ -139,7 +139,7 @@ export function VenueForm({ initialData, onSubmit, title }: VenueFormProps) {
             <FormField label="Category">
                 <select
                   value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value as "Hall" | "Studio" | "Outdoor" | "Office" })}
                   className="w-full bg-zinc-50 border-[0.5px] border-zinc-200 p-4 text-xs font-medium focus:outline-none focus:border-black transition-colors appearance-none"
                 >
                   <option value="Hall">Hall</option>

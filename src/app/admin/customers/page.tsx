@@ -67,9 +67,9 @@ export default function CustomersPage() {
               <h2 className="text-[10px] font-bold uppercase tracking-widest text-black">Intelligence Log</h2>
             </div>
             <p className="text-xl font-serif text-black leading-relaxed">
-              "Operational analysis complete. 
+              &quot;Operational analysis complete. 
               We have <span className="font-bold underline text-green-600">{stats.returning} returning clients</span> who contribute to <span className="font-bold">45%</span> of total revenue. 
-              Recommendation: Engage <span className="font-bold">{stats.topCustomer}</span> for primary venue allocations."
+              Recommendation: Engage <span className="font-bold">{stats.topCustomer}</span> for primary venue allocations.&quot;
             </p>
           </div>
         </div>

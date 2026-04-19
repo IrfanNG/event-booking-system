@@ -106,7 +106,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const lang: Language = "EN";
 
   const t = (key: string) => {
-    return (translations[lang] as any)[key] || key;
+    return (translations[lang] as Record<string, string>)[key] || key;
   };
 
   return (

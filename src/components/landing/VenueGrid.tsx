@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useVenues } from "@/hooks/useVenues";
@@ -13,6 +13,13 @@ export function VenueGrid() {
   const { t } = useLanguage();
   const { venues, loading } = useVenues();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  // Safari hydration fix: ensures we only render interactive state after mount
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   const filteredVenues = selectedCategory 
     ? venues.filter(v => v.category === selectedCategory)
@@ -22,7 +29,7 @@ export function VenueGrid() {
     return t(`cat_${cat.toLowerCase()}`);
   };
 
-  if (loading) {
+  if (!mounted || loading) {
     return (
       <section id="venues" className="w-full bg-white px-6 py-16 lg:py-24">
         <div className="mx-auto max-w-7xl">
@@ -74,16 +81,16 @@ export function VenueGrid() {
           </div>
         </div>
 
-      <motion.div layout className="grid gap-12 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Removed layout prop from motion.div for Safari performance stability */}
+      <div className="grid gap-12 sm:grid-cols-2 lg:grid-cols-3">
         <AnimatePresence mode="popLayout">
-          {filteredVenues.map((venue, idx) => (
+          {filteredVenues.map((venue) => (
             <motion.div
-              layout
               key={venue.id}
-              initial={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.3 }}
             >
               <Link href={`/venues/${venue.id}`} className="group block cursor-pointer">
                 <div className="relative aspect-[4/5] overflow-hidden border-[0.5px] border-zinc-200 bg-zinc-100 transition-transform group-hover:scale-[0.99]">
@@ -91,6 +98,7 @@ export function VenueGrid() {
                     src={venue.image}
                     alt={venue.name}
                     fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     className="object-cover transition-transform duration-700 group-hover:scale-110"
                   />
                   <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-md px-3 py-1 text-[10px] font-bold uppercase tracking-widest border-[0.5px] border-zinc-200 text-black">
@@ -127,7 +135,7 @@ export function VenueGrid() {
             </motion.div>
           ))}
         </AnimatePresence>
-      </motion.div>
+      </div>
     </div>
   </section>
   );

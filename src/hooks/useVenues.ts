@@ -5,36 +5,78 @@ import { db } from "@/lib/firebase";
 import { 
   collection, 
   query, 
-  orderBy, 
   onSnapshot, 
   doc, 
   addDoc, 
   updateDoc, 
   deleteDoc,
-  serverTimestamp 
+  serverTimestamp,
+  Timestamp 
 } from "firebase/firestore";
 import { Venue } from "@/lib/mockData";
 
 export function useVenues() {
   const [venues, setVenues] = useState<Venue[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasSynced, setHasSynced] = useState(false);
 
   useEffect(() => {
-    const q = query(collection(db, "venues"), orderBy("createdAt", "desc"));
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Venue[];
-      setVenues(data);
-      setLoading(false);
-    }, (error) => {
-      console.error("useVenues Error:", error);
-      setLoading(false);
-    });
+    let active = true;
+    let unsubscribe = () => {};
 
-    return () => unsubscribe();
+    const startSync = () => {
+      try {
+        if (!db) {
+          setLoading(false);
+          return;
+        }
+
+        const q = query(collection(db, "venues"));
+        
+        unsubscribe = onSnapshot(q, (snapshot) => {
+          if (!active) return;
+
+          if (snapshot.empty) {
+            console.warn("[useVenues] Firestore collection 'venues' is empty.");
+            setVenues([]);
+          } else {
+            const data = snapshot.docs.map(d => ({
+              id: d.id,
+              ...d.data()
+            })) as Venue[];
+            
+            // Manual sort by createdAt if it exists, or ID as fallback
+            const sortedData = [...data].sort((a, b) => {
+              const timeA = a.createdAt instanceof Timestamp ? a.createdAt.seconds : 0;
+              const timeB = b.createdAt instanceof Timestamp ? b.createdAt.seconds : 0;
+              if (timeA !== timeB) return timeB - timeA;
+              return b.id.localeCompare(a.id);
+            });
+
+            setVenues(sortedData);
+            setHasSynced(true);
+          }
+          setLoading(false);
+        }, (error) => {
+          console.error("[useVenues] Firestore Sync Error:", error);
+          if (active) {
+            setLoading(false);
+          }
+        });
+      } catch (err) {
+        console.error("[useVenues] Initialization Error:", err);
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    startSync();
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, []);
 
   const addVenue = async (data: Omit<Venue, "id">) => {
@@ -75,5 +117,5 @@ export function useVenues() {
     }
   };
 
-  return { venues, loading, addVenue, updateVenue, deleteVenue };
+  return { venues, loading, hasSynced, addVenue, updateVenue, deleteVenue };
 }

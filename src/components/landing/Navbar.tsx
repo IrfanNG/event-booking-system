@@ -30,8 +30,8 @@ export function Navbar() {
   ];
 
   return (
-    <nav className="sticky top-0 z-[100] w-full border-b-[0.5px] border-zinc-200 bg-white/80 backdrop-blur-md dark:border-zinc-800 dark:bg-black/80">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
+    <nav className="sticky top-0 z-[200] w-full border-b-[0.5px] border-zinc-200 bg-white dark:border-zinc-800 dark:bg-black pointer-events-auto">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 relative">
         {/* Logo */}
         <div className="flex items-center gap-4 sm:gap-8 min-w-0">
           <Link
@@ -71,32 +71,35 @@ export function Navbar() {
         )}
 
         {/* Mobile Actions */}
-        {!isVenuePage && (
-          <div className="flex lg:hidden items-center gap-2">
-            <button
-              onClick={() => setIsOpen(!isOpen)}
-              className="flex h-10 w-10 items-center justify-center text-zinc-900 dark:text-zinc-50"
-              aria-label="Toggle menu"
-            >
-              {isOpen ? (
-                <X size={24} strokeWidth={1.5} />
-              ) : (
-                <Menu size={24} strokeWidth={1.5} />
-              )}
-            </button>
-          </div>
-        )}
+        <div className="flex lg:hidden items-center gap-2 relative z-[210]">
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsOpen(!isOpen);
+            }}
+            className="flex h-12 w-12 items-center justify-center text-zinc-900 transition-colors active:bg-zinc-100 dark:text-zinc-50 dark:active:bg-zinc-900 cursor-pointer touch-none select-none"
+            aria-label="Toggle menu"
+          >
+            {isOpen ? (
+              <X size={24} strokeWidth={1.5} className="pointer-events-none" />
+            ) : (
+              <Menu size={24} strokeWidth={1.5} className="pointer-events-none" />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Mobile Menu Drawer */}
-      <AnimatePresence>
-        {!isVenuePage && isOpen && (
+      <AnimatePresence mode="wait">
+        {isOpen && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed inset-x-0 top-[64px] z-[90] w-full border-b-[0.5px] border-zinc-200 bg-white/95 backdrop-blur-xl px-6 py-10 shadow-2xl lg:hidden dark:border-zinc-800 dark:bg-zinc-950/95"
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="fixed inset-x-0 top-[64px] z-[300] w-full border-b-[0.5px] border-zinc-200 bg-white px-6 py-10 shadow-2xl lg:hidden dark:border-zinc-800 dark:bg-zinc-950 pointer-events-auto"
           >
             <div className="flex flex-col space-y-6">
               {navLinks.map((link) => (

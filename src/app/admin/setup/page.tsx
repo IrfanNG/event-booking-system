@@ -5,8 +5,7 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "fire
 import { auth, db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { venues } from "@/lib/mockData";
-import { motion } from "framer-motion";
-import { ShieldAlert, CheckCircle, Loader2, Database, AlertCircle } from "lucide-react";
+import { ShieldAlert, CheckCircle, Loader2, Database } from "lucide-react";
 
 export default function AdminSetup() {
   const [loading, setLoading] = useState(false);
@@ -21,8 +20,9 @@ export default function AdminSetup() {
     try {
       await createUserWithEmailAndPassword(auth, "admin@espace.com", "admin123");
       setDone(true);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      const error = err as { message?: string };
+      setError(error.message || "Unknown error occurred.");
     } finally {
       setLoading(false);
     }
@@ -36,12 +36,13 @@ export default function AdminSetup() {
       if (!auth.currentUser) {
         try {
           await signInWithEmailAndPassword(auth, "admin@espace.com", "admin123");
-        } catch (authErr) {
+        } catch {
           throw new Error("Admin authentication failed. Please 'Create Admin Account' first or login manually.");
         }
       }
 
       for (const venue of venues) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { id, ...venueData } = venue;
         await addDoc(collection(db, "venues"), {
           ...venueData,
@@ -49,12 +50,13 @@ export default function AdminSetup() {
         });
       }
       setSeedDone(true);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Seed Error:", err);
-      if (err.code === "permission-denied") {
+      const error = err as { code?: string; message?: string };
+      if (error.code === "permission-denied") {
         setError("Firebase Permission Denied. Ensure your Firestore Rules allow 'write' for authenticated users.");
       } else {
-        setError(err.message);
+        setError(error.message || "Unknown seeding error.");
       }
     } finally {
       setSeedLoading(false);

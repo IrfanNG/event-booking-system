@@ -3,19 +3,20 @@
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
 import { collection, query, orderBy, onSnapshot, doc, updateDoc } from "firebase/firestore";
+import { Booking } from "@/lib/mockData";
 
 export function useBookings() {
-  const [bookings, setBookings] = useState<any[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const q = query(collection(db, "bookings"), orderBy("createdAt", "desc"));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const data = snapshot.docs.map(d => ({
+        id: d.id,
+        ...d.data()
+      })) as Booking[];
       setBookings(data);
       setLoading(false);
     }, (error) => {
@@ -43,8 +44,8 @@ export function useBookings() {
 
   const getUserBookings = (email: string, phone: string) => {
     return bookings.filter(b => 
-      b.customerEmail.toLowerCase() === email.toLowerCase() && 
-      b.customerPhone.replace(/[^0-9]/g, "") === phone.replace(/[^0-9]/g, "")
+      b.customerEmail?.toLowerCase() === email.toLowerCase() && 
+      b.customerPhone?.replace(/[^0-9]/g, "") === phone.replace(/[^0-9]/g, "")
     );
   };
 

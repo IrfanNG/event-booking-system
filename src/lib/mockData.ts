@@ -1,3 +1,5 @@
+import { Timestamp } from "firebase/firestore";
+
 export interface Venue {
   id: string;
   name: string;
@@ -8,6 +10,24 @@ export interface Venue {
   image: string;
   category: "Hall" | "Studio" | "Outdoor" | "Office";
   amenities: string[];
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+export interface Booking {
+  id: string;
+  referenceId: string;
+  venueId: string;
+  venueName: string;
+  date: Timestamp | Date | string | null; 
+  timeSlot: "full" | "morning" | "evening";
+  guests: number;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  totalPrice: number;
+  status: "pending" | "approved" | "rejected";
+  createdAt?: Timestamp;
 }
 
 export const venues: Venue[] = [
