@@ -595,6 +595,12 @@ export default function VenueDetails() {
                 {t("sidebar_reserve")}
               </button>
 
+              <div className="mt-4 text-center">
+                <Link href="/policies" className="text-[10px] font-medium text-zinc-400 hover:text-black transition-colors border-b border-zinc-100 pb-0.5">
+                  Review booking policies
+                </Link>
+              </div>
+
               <p className="mt-4 text-center text-[10px] font-medium text-zinc-400">
                 {t("sidebar_service_note")}
               </p>

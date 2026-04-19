@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 import { Hero } from "@/components/landing/Hero";
 import { VenueGrid } from "@/components/landing/VenueGrid";
 import { useLanguage } from "@/context/LanguageContext";
@@ -79,7 +80,7 @@ export default function Home() {
         <div className="mb-8 flex justify-center gap-8 text-[10px] font-bold uppercase tracking-widest text-zinc-400">
           <a href="#" className="hover:text-black transition-colors">Instagram</a>
           <a href="#" className="hover:text-black transition-colors">TikTok</a>
-          <a href="#" className="hover:text-black transition-colors">X</a>
+          <Link href="/policies" className="hover:text-black transition-colors text-black border-b-[0.5px] border-black pb-0.5">Policies</Link>
         </div>
         <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">
           ESPACE &copy; 2026. ALL RIGHTS RESERVED.
