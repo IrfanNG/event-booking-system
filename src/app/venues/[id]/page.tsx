@@ -347,6 +347,51 @@ export default function VenueDetails() {
                   </div>
                 )}
 
+                {/* Guest Input with Stepper */}
+                <div className="border-[0.5px] border-zinc-200 p-4 transition-colors hover:border-black group">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 group-hover:text-black block mb-1">{t("sidebar_guests")}</label>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="number"
+                        value={guestCount || ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === "") {
+                            setGuestCount(0);
+                            return;
+                          }
+                          const num = parseInt(val);
+                          setGuestCount(Math.max(0, Math.min(venue.capacity, num)));
+                        }}
+                        onFocus={(e) => e.target.select()}
+                        onBlur={() => {
+                          if (guestCount < 1) setGuestCount(1);
+                        }}
+                        className="w-20 text-sm font-medium text-black bg-transparent border-none focus:ring-0 p-0"
+                      />
+                      <span className="text-sm font-medium text-black">{t("sidebar_guests")}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={() => setGuestCount(Math.max(1, guestCount - 1))}
+                        className="p-1 rounded-full border border-zinc-100 hover:border-black hover:bg-zinc-50 transition-colors"
+                      >
+                        <Minus className="h-3 w-3" />
+                      </button>
+                      <button 
+                        onClick={() => setGuestCount(Math.min(venue.capacity, guestCount + 1))}
+                        className="p-1 rounded-full border border-zinc-100 hover:border-black hover:bg-zinc-50 transition-colors"
+                      >
+                        <Plus className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-[9px] font-medium text-zinc-400 mt-2 uppercase tracking-wide">
+                    {t("sidebar_max_guests").replace("{count}", venue.capacity.toString())}
+                  </p>
+                </div>
+
                 <div className="space-y-3 pt-4 border-t border-zinc-50">
                   <div className={`border-[0.5px] p-4 transition-colors ${errors.name ? 'border-red-500 bg-red-50/10' : 'border-zinc-200 hover:border-black'} group`}>
                     <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 group-hover:text-black block mb-1">{t("sidebar_name")}</label>

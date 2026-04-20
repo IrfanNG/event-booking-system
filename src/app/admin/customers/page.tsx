@@ -13,8 +13,17 @@ export default function CustomersPage() {
   const customers = useMemo(() => {
     const customerMap = new Map();
 
+    const getMs = (date: any) => {
+      if (!date) return 0;
+      if (date.seconds) return date.seconds * 1000;
+      if (date instanceof Date) return date.getTime();
+      return new Date(date).getTime();
+    };
+
     bookings.forEach((b) => {
       const email = b.customerEmail || "unknown@espace.com";
+      const bookingActivityDate = b.createdAt || b.date; // Use creation date for "Active" status
+
       if (!customerMap.has(email)) {
         customerMap.set(email, {
           email,
@@ -22,7 +31,7 @@ export default function CustomersPage() {
           phone: b.customerPhone,
           totalSpent: 0,
           bookingCount: 0,
-          lastBooking: b.date,
+          lastBooking: bookingActivityDate,
           history: []
         });
       }
@@ -31,9 +40,9 @@ export default function CustomersPage() {
       data.totalSpent += (b.totalPrice || 0);
       data.bookingCount += 1;
       
-      // Check if this booking is more recent
-      if (b.date?.seconds > (data.lastBooking?.seconds || 0)) {
-        data.lastBooking = b.date;
+      // Compare activity dates robustly
+      if (getMs(bookingActivityDate) > getMs(data.lastBooking)) {
+        data.lastBooking = bookingActivityDate;
       }
       
       data.history.push(b);

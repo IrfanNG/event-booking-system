@@ -33,7 +33,7 @@ export function Hero() {
           </Link>
           <Link 
             href="#about"
-            className="flex h-12 w-48 items-center justify-center border-[0.5px] border-zinc-200 text-sm font-bold uppercase tracking-widest text-zinc-950 transition-colors hover:bg-zinc-100 dark:border-zinc-800 dark:text-white dark:hover:bg-zinc-900"
+            className="flex h-12 w-48 items-center justify-center border-[0.5px] border-zinc-200 bg-zinc-50 text-sm font-bold uppercase tracking-widest text-zinc-950 transition-all hover:bg-zinc-100 dark:bg-zinc-900 dark:border-zinc-800 dark:text-white dark:hover:bg-zinc-800"
           >
             {t("btn_learn_more")}
           </Link>
