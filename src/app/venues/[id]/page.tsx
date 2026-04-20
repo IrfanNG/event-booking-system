@@ -254,15 +254,15 @@ export default function VenueDetails() {
         </div>
       </nav>
 
-      <main className="mx-auto max-w-7xl px-6 py-12 lg:py-20">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-16 mt-16">
+      <main className="mx-auto max-w-7xl px-6 pt-20 pb-12 lg:pb-20">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-16 mt-0">
           <div className="lg:col-span-2">
-            <Link href="/" className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-black transition-colors mb-12">
+            <Link href="/" className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-black transition-colors mb-2">
               <ArrowLeft className="h-3 w-3" /> {t("details_back")}
             </Link>
 
-            <h1 className="font-serif text-5xl font-light tracking-tighter md:text-7xl mb-6">{venueName}</h1>
-            <div className="flex items-center gap-6 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 mb-12">
+            <h1 className="font-serif text-5xl font-light tracking-tighter md:text-7xl mb-4">{venueName}</h1>
+            <div className="flex items-center gap-6 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 mb-8">
               <span className="flex items-center gap-2"><MapPin className="h-3 w-3" /> {venueLocation}</span>
               <span className="flex items-center gap-2 text-black"><Star className="h-3 w-3 fill-black" /> 4.9 {t("details_reviews").replace("{count}", "128")}</span>
             </div>
@@ -283,6 +283,18 @@ export default function VenueDetails() {
             <div className="mt-16">
               <h2 className="font-serif text-3xl tracking-tight mb-8">{t("details_about")}</h2>
               <p className="text-base leading-relaxed text-zinc-600 max-w-2xl">{venueDescription}</p>
+            </div>
+
+            <div className="mt-16">
+              <h2 className="font-serif text-3xl tracking-tight mb-8">{t("details_amenities")}</h2>
+              <div className="grid grid-cols-2 gap-y-4 gap-x-12">
+                {venueAmenities.map((item) => (
+                  <div key={item} className="flex items-center gap-3 text-sm text-zinc-600 pb-3 border-b border-zinc-50">
+                    <Check className="h-4 w-4 text-zinc-900" />
+                    {item}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
