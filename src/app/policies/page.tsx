@@ -1,15 +1,21 @@
+"use client";
+
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeft, ShieldCheck, Clock, CreditCard, AlertTriangle } from "lucide-react";
 
 export default function PoliciesPage() {
+  const searchParams = useSearchParams();
+  const venueId = searchParams.get("venueId");
+
   return (
     <div className="min-h-screen bg-white text-black font-sans selection:bg-zinc-100">
       <main className="mx-auto max-w-4xl px-6 py-12 md:py-20">
         <Link 
-          href="/" 
+          href={venueId ? `/venues/${venueId}` : "/"} 
           className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-black transition-colors mb-8"
         >
-          <ArrowLeft className="h-3 w-3" /> Home
+          <ArrowLeft className="h-3 w-3" /> {venueId ? "Back to Venue" : "Home"}
         </Link>
 
         <h1 className="font-serif text-5xl font-light tracking-tighter md:text-7xl mb-8">

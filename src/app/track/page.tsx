@@ -145,11 +145,19 @@ export default function TrackBookingPage() {
                           <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-4 text-sm font-medium text-zinc-500">
                             <div className="flex items-center gap-2">
                               <Calendar className="h-4 w-4 text-zinc-300" />
-                              {booking.date?.toDate ? format(booking.date.toDate(), "PPP") : booking.date}
+                              {booking.date?.toDate ? (
+                                booking.endDate?.toDate ? (
+                                  `${format(booking.date.toDate(), "MMM d")} - ${format(booking.endDate.toDate(), "MMM d, yyyy")}`
+                                ) : (
+                                  format(booking.date.toDate(), "PPP")
+                                )
+                              ) : (
+                                typeof booking.date === 'string' ? booking.date : "TBD"
+                              )}
                             </div>
                             <div className="flex items-center gap-2">
                               <Clock className="h-4 w-4 text-zinc-300" />
-                              <span className="capitalize">{booking.timeSlot} Session</span>
+                              <span className="capitalize">{booking.timeSlot === 'custom' ? 'Custom Schedule' : `${booking.timeSlot} Session`}</span>
                             </div>
                             <div className="flex items-center gap-2">
                               <Package className="h-4 w-4 text-zinc-300" />

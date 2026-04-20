@@ -20,7 +20,8 @@ export interface Booking {
   venueId: string;
   venueName: string;
   date: Timestamp | Date | string | null; 
-  timeSlot: "full" | "morning" | "evening";
+  endDate?: Timestamp | Date | string | null;
+  timeSlot: "full" | "morning" | "evening" | "custom";
   guests: number;
   customerName: string;
   customerEmail: string;

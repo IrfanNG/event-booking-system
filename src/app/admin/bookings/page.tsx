@@ -22,6 +22,7 @@ export default function BookingsPage() {
       case "full": return "Full Day (8AM - 10PM)";
       case "morning": return "Morning (8AM - 1PM)";
       case "evening": return "Evening (2PM - 10PM)";
+      case "custom": return "Custom Schedule";
       default: return slot;
     }
   };
@@ -199,9 +200,16 @@ export default function BookingsPage() {
                       <div className="space-y-4">
                         <div className="flex justify-between">
                           <span className="text-xs text-zinc-400 font-medium">Date</span>
-                          <span className="text-xs font-bold text-black">{selectedBooking.date?.seconds ? format(new Date(selectedBooking.date.seconds * 1000), "PPPP") : "TBD"}</span>
-                        </div>
-                        <div className="flex justify-between">
+                          <span className="text-xs font-bold text-black text-right">
+                            {selectedBooking.date?.seconds ? (
+                              selectedBooking.endDate?.seconds ? (
+                                `${format(new Date(selectedBooking.date.seconds * 1000), "MMM d")} - ${format(new Date(selectedBooking.endDate.seconds * 1000), "MMM d, yyyy")}`
+                              ) : (
+                                format(new Date(selectedBooking.date.seconds * 1000), "PPPP")
+                              )
+                            ) : "TBD"}
+                          </span>
+                        </div>                        <div className="flex justify-between">
                           <span className="text-xs text-zinc-400 font-medium">Time Slot</span>
                           <span className="text-xs font-bold text-black uppercase tracking-tight">{getTimeSlotLabel(selectedBooking.timeSlot)}</span>
                         </div>
