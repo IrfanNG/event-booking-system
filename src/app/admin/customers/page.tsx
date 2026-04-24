@@ -1,34 +1,42 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { User, Mail, Phone, Calendar, Sparkles, TrendingUp } from "lucide-react";
+import { User, Mail, Phone, Calendar, Sparkles, TrendingUp, Filter } from "lucide-react";
 import { useBookings } from "@/hooks/useBookings";
 import { format } from "date-fns";
+import { Booking } from "@/lib/mockData";
+import { normalizeDate, toEpochMs } from "@/lib/bookingNormalization";
+import { resolveBookingFinance } from "@/lib/finance";
+
+interface CustomerSummary {
+  email: string;
+  name: string;
+  phone: string;
+  totalSpent: number;
+  bookingCount: number;
+  lastBooking: Booking["createdAt"] | Booking["date"] | null;
+  history: Booking[];
+}
 
 export default function CustomersPage() {
   const { bookings, loading } = useBookings();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [tierFilter, setTierFilter] = useState<"all" | "new" | "returning" | "elite">("all");
 
   // Logic to transform bookings into unique customer dossiers
   const customers = useMemo(() => {
-    const customerMap = new Map();
-
-    const getMs = (date: any) => {
-      if (!date) return 0;
-      if (date.seconds) return date.seconds * 1000;
-      if (date instanceof Date) return date.getTime();
-      return new Date(date).getTime();
-    };
+    const customerMap = new Map<string, CustomerSummary>();
 
     bookings.forEach((b) => {
-      const email = b.customerEmail || "unknown@espace.com";
+      const email = b.customer.normalizedEmail || b.customerEmail || "unknown@espace.com";
       const bookingActivityDate = b.createdAt || b.date; // Use creation date for "Active" status
 
       if (!customerMap.has(email)) {
         customerMap.set(email, {
           email,
           name: b.customerName,
-          phone: b.customerPhone,
+          phone: b.customer.normalizedPhone || b.customerPhone,
           totalSpent: 0,
           bookingCount: 0,
           lastBooking: bookingActivityDate,
@@ -37,11 +45,12 @@ export default function CustomersPage() {
       }
 
       const data = customerMap.get(email);
-      data.totalSpent += (b.totalPrice || 0);
+      if (!data) return;
+      data.totalSpent += resolveBookingFinance(b).netAmount;
       data.bookingCount += 1;
       
       // Compare activity dates robustly
-      if (getMs(bookingActivityDate) > getMs(data.lastBooking)) {
+      if (toEpochMs(bookingActivityDate) > toEpochMs(data.lastBooking)) {
         data.lastBooking = bookingActivityDate;
       }
       
@@ -57,11 +66,56 @@ export default function CustomersPage() {
     topCustomer: customers[0]?.name || "-"
   };
 
+  const filteredCustomers = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    return customers.filter((customer) => {
+      const tierMatch =
+        tierFilter === "all" ||
+        (tierFilter === "new" && customer.bookingCount === 1) ||
+        (tierFilter === "returning" && customer.bookingCount === 2) ||
+        (tierFilter === "elite" && customer.bookingCount > 2);
+
+      if (!tierMatch) return false;
+      if (!normalizedSearch) return true;
+
+      return [customer.name, customer.email, customer.phone].some((value) =>
+        value?.toLowerCase().includes(normalizedSearch)
+      );
+    });
+  }, [customers, searchTerm, tierFilter]);
+
   return (
     <div className="p-8">
       <div className="mb-12">
         <h1 className="font-serif text-4xl font-light tracking-tighter text-black">Customer Intelligence</h1>
         <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">Holistic view of your audience</p>
+      </div>
+
+      <div className="mb-8 flex flex-wrap gap-4">
+        <div className="flex items-center gap-4 border-[0.5px] border-zinc-200 px-3 py-1.5 bg-white">
+          <input
+            type="text"
+            placeholder="Search client, email, phone..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="bg-transparent text-[11px] outline-none w-56 font-bold uppercase tracking-wider text-black placeholder:text-zinc-300"
+          />
+        </div>
+        <label className="flex items-center gap-2 border-[0.5px] border-zinc-200 bg-white px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest shadow-sm">
+          <Filter className="h-3 w-3" />
+          <span className="text-zinc-400">Tier</span>
+          <select
+            value={tierFilter}
+            onChange={(e) => setTierFilter(e.target.value as "all" | "new" | "returning" | "elite")}
+            className="bg-transparent text-black outline-none"
+          >
+            <option value="all">All</option>
+            <option value="new">New</option>
+            <option value="returning">Returning</option>
+            <option value="elite">Elite</option>
+          </select>
+        </label>
       </div>
 
       {/* Maya & Jargon Intelligence Section */}
@@ -125,9 +179,9 @@ export default function CustomersPage() {
             <tbody className="divide-y-[0.5px] divide-zinc-100">
               {loading ? (
                 <tr><td colSpan={6} className="px-6 py-20 text-center text-[10px] font-bold uppercase tracking-widest text-zinc-300">Syncing Intelligence...</td></tr>
-              ) : customers.length === 0 ? (
+              ) : filteredCustomers.length === 0 ? (
                 <tr><td colSpan={6} className="px-6 py-20 text-center text-[10px] font-bold uppercase tracking-widest text-zinc-300">Database Empty.</td></tr>
-              ) : customers.map((c) => (
+              ) : filteredCustomers.map((c) => (
                 <tr key={c.email} className="group hover:bg-zinc-50 transition-colors">
                   <td className="px-6 py-6">
                     <div className="flex items-center gap-3">
@@ -136,7 +190,12 @@ export default function CustomersPage() {
                       </div>
                       <div>
                         <p className="text-xs font-bold text-black uppercase tracking-tight">{c.name}</p>
-                        <p className="text-[10px] text-zinc-400 font-medium">Joined {c.history[0]?.createdAt?.seconds ? format(new Date(c.history[0].createdAt.seconds * 1000), "MMM yyyy") : "-"}</p>
+                        <p className="text-[10px] text-zinc-400 font-medium">
+                          Joined {(() => {
+                            const joinedDate = normalizeDate(c.history[0]?.createdAt);
+                            return joinedDate ? format(joinedDate, "MMM yyyy") : "-";
+                          })()}
+                        </p>
                       </div>
                     </div>
                   </td>
@@ -151,7 +210,10 @@ export default function CustomersPage() {
                   <td className="px-6 py-6">
                     <div className="flex items-center gap-2 text-[10px] font-bold text-black uppercase">
                       <Calendar className="h-3 w-3" />
-                      {c.lastBooking?.seconds ? format(new Date(c.lastBooking.seconds * 1000), "PPP") : "TBD"}
+                      {(() => {
+                        const lastBookingDate = normalizeDate(c.lastBooking);
+                        return lastBookingDate ? format(lastBookingDate, "PPP") : "TBD";
+                      })()}
                     </div>
                   </td>
                   <td className="px-6 py-6 text-xs font-bold text-black">{c.bookingCount}</td>

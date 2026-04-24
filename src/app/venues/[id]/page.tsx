@@ -1,27 +1,27 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { useVenues } from "@/hooks/useVenues";
 import { useBookings } from "@/hooks/useBookings";
 import { motion, AnimatePresence } from "framer-motion";
-import { MapPin, Users, Shield, Star, Check, Calendar, ArrowLeft, PartyPopper, Plus, Minus, X, Loader2, Clock } from "lucide-react";
+import { MapPin, Users, Shield, Star, Check, Calendar, ArrowLeft, PartyPopper, Plus, Minus, Loader2 } from "lucide-react";
 import { DayPicker, DateRange } from "react-day-picker";
-import { format, addDays, eachDayOfInterval, isSameDay } from "date-fns";
+import { format, addDays, eachDayOfInterval } from "date-fns";
 import "react-day-picker/dist/style.css";
 
 import { useLanguage } from "@/context/LanguageContext";
-
-import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp, query, where, getDocs, Timestamp } from "firebase/firestore";
+import { type BookingSlot, type CreateBookingPayload, type CreateBookingResponse } from "@/lib/booking";
+import { isInactiveBookingStatus, normalizeDate } from "@/lib/bookingNormalization";
 
 export default function VenueDetails() {
   const { id } = useParams();
-  const { venues, loading: venuesLoading } = useVenues();
+  const { venues, loading: venuesLoading } = useVenues({ includeArchived: true });
   const { getVenueBookings } = useBookings();
   const venue = venues.find((v) => v.id === id);
+  const isArchived = venue?.isArchived === true;
   const venueBookings = getVenueBookings(id as string);
   const { t } = useLanguage();
 
@@ -31,7 +31,7 @@ export default function VenueDetails() {
   
   const [selectedDate, setSelectedDate] = useState<DateRange | undefined>(undefined);
   const [guestCount, setGuestCount] = useState(1);
-  const [dailySlots, setDailySlots] = useState<Record<string, "full" | "morning" | "evening">>({});
+  const [dailySlots, setDailySlots] = useState<Record<string, BookingSlot>>({});
   const [showCalendar, setShowCalendar] = useState(false);
   const [isSidebarInView, setIsSidebarInView] = useState(false);
 
@@ -49,15 +49,29 @@ export default function VenueDetails() {
   useEffect(() => {
     const newSlots = { ...dailySlots };
     let changed = false;
+    let hasUnavailableDay = false;
     selectedDays.forEach(day => {
       const dStr = format(day, "yyyy-MM-dd");
-      if (!newSlots[dStr]) {
-        newSlots[dStr] = "full";
+      const availableSlots = getAvailableSlotsForDate(day);
+      if (availableSlots.length === 0) {
+        delete newSlots[dStr];
+        changed = true;
+        hasUnavailableDay = true;
+        return;
+      }
+
+      const nextSlot = availableSlots[0];
+      if (!newSlots[dStr] || !availableSlots.includes(newSlots[dStr])) {
+        newSlots[dStr] = nextSlot;
         changed = true;
       }
     });
+    if (hasUnavailableDay) {
+      setSelectedDate(undefined);
+      setBookingError("One or more selected dates are no longer available.");
+    }
     if (changed) setDailySlots(newSlots);
-  }, [selectedDays]);
+  }, [selectedDays, venueBookings]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -75,41 +89,85 @@ export default function VenueDetails() {
 
   const [bookingStep, setBookingStep] = useState<"idle" | "confirm" | "processing" | "success">("idle");
   const [bookingRef, setBookingRef] = useState("");
+  const [bookingError, setBookingError] = useState("");
 
   // Contact Info State
   const [userData, setUserData] = useState({ name: "", email: "", phone: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [botTrap, setBotTrap] = useState("");
 
   const calendarRef = useRef<HTMLDivElement>(null);
+
+  const getBookingWindow = (booking: (typeof venueBookings)[number]) => {
+    const start = normalizeDate(booking.date);
+    if (!start) return null;
+
+    const end = normalizeDate(booking.endDate) ?? start;
+    if (end < start) return null;
+
+    return { start, end };
+  };
+
+  const getBookedSlotsForDate = (booking: (typeof venueBookings)[number], date: Date) => {
+    const dayKey = format(date, "yyyy-MM-dd");
+    const scheduledSlot = booking.dailySchedule?.[dayKey];
+
+    if (scheduledSlot === "full" || scheduledSlot === "morning" || scheduledSlot === "evening") {
+      return [scheduledSlot];
+    }
+
+    if (booking.timeSlot === "full" || booking.timeSlot === "morning" || booking.timeSlot === "evening") {
+      return [booking.timeSlot];
+    }
+
+    if (booking.timeSlot === "custom") {
+      return ["full"];
+    }
+
+    return [];
+  };
+
+  const getAvailableSlotsForDate = (date: Date): BookingSlot[] => {
+    const bookedSlots = getActiveBookingsForDate(date).flatMap((booking) => getBookedSlotsForDate(booking, date));
+    const booked = new Set(bookedSlots);
+
+    if (booked.has("full") || (booked.has("morning") && booked.has("evening"))) {
+      return [];
+    }
+
+    return ["full", "morning", "evening"].filter((slot) => {
+      if (slot === "full") {
+        return booked.size === 0;
+      }
+
+      return !booked.has(slot);
+    }) as BookingSlot[];
+  };
 
   const getActiveBookingsForDate = (date: Date) => {
     return venueBookings
       .filter(b => {
-        if (b.status === "rejected") return false;
-        const bDate = b.date?.toDate ? b.date.toDate() : new Date(b.date);
-        return isSameDay(bDate, date);
+        if (isInactiveBookingStatus(b.status)) return false;
+        const window = getBookingWindow(b);
+        if (!window) return false;
+        return date >= window.start && date <= window.end;
       });
   };
 
-  const isSlotUnavailable = (date: Date, slot: string) => {
-    const activeBookings = getActiveBookingsForDate(date);
-    const bookedSlots = activeBookings.map(b => b.timeSlot);
-    if (bookedSlots.includes("full")) return true;
-    if (slot === "full" && bookedSlots.length > 0) return true;
-    return bookedSlots.includes(slot);
+  const isDateFullyBlocked = (date: Date) => {
+    const bookedSlots = getActiveBookingsForDate(date).flatMap((booking) => getBookedSlotsForDate(booking, date));
+    return bookedSlots.includes("full") || (bookedSlots.includes("morning") && bookedSlots.includes("evening"));
   };
 
   const disabledDays = [
     { before: addDays(new Date(), 2) },
     ...venueBookings
-      .filter(b => {
-        if (b.status === "rejected") return false;
-        const date = b.date?.toDate ? b.date.toDate() : new Date(b.date);
-        const active = getActiveBookingsForDate(date);
-        const booked = active.map(b => b.timeSlot);
-        return booked.includes("full") || (booked.includes("morning") && booked.includes("evening"));
+      .flatMap((booking) => {
+        const window = getBookingWindow(booking);
+        if (!window) return [];
+
+        return eachDayOfInterval({ start: window.start, end: window.end }).filter((day) => isDateFullyBlocked(day));
       })
-      .map(b => b.date?.toDate ? b.date.toDate() : new Date(b.date))
   ];
 
   useEffect(() => {
@@ -123,93 +181,132 @@ export default function VenueDetails() {
   }, []);
 
   const calculateTotal = () => {
-    if (!venue || selectedDays.length === 0) return 0;
-    
-    const baseTotal = selectedDays.reduce((acc, day) => {
+    return calculatePricing().totalAmount;
+  };
+
+  const calculatePricing = () => {
+    if (!venue || selectedDays.length === 0) {
+      return {
+        currency: "MYR",
+        baseAmount: 0,
+        serviceFeeAmount: 0,
+        depositAmount: 0,
+        refundAmount: 0,
+        totalAmount: 0,
+      };
+    }
+
+    const baseAmount = selectedDays.reduce((acc, day) => {
       const dStr = format(day, "yyyy-MM-dd");
       const slot = dailySlots[dStr] || "full";
       const factor = slot === "full" ? 1 : 0.6;
       return acc + (venue.price * factor);
     }, 0);
 
-    const serviceFee = baseTotal * 0.1;
-    return baseTotal + serviceFee;
+    const serviceFeeAmount = baseAmount * 0.1;
+    const totalAmount = baseAmount + serviceFeeAmount;
+
+    return {
+      currency: "MYR",
+      baseAmount: Number(baseAmount.toFixed(2)),
+      serviceFeeAmount: Number(serviceFeeAmount.toFixed(2)),
+      depositAmount: 0,
+      refundAmount: 0,
+      totalAmount: Number(totalAmount.toFixed(2)),
+    };
   };
 
   const handleStartBooking = () => {
-    if (selectedDate?.from && validate()) setBookingStep("confirm");
+    if (bookingStep !== "idle") return;
+    if (selectedDate?.from && validate()) {
+      setBookingError("");
+      setBookingStep("confirm");
+    }
   };
 
   const handleFinalConfirm = async () => {
+    if (bookingStep === "processing") return;
     if (!venue || !selectedDate?.from) return;
+    setBookingError("");
     setBookingStep("processing");
-
-    // Pre-flight collision check for EACH day in range
-    try {
-      for (const day of selectedDays) {
-        const dStr = format(day, "yyyy-MM-dd");
-        const slot = dailySlots[dStr] || "full";
-        
-        const q = query(
-          collection(db, "bookings"),
-          where("venueId", "==", venue.id),
-          where("status", "!=", "rejected")
-        );
-        
-        const snapshot = await getDocs(q);
-        const bookedSlots = snapshot.docs
-          .filter(doc => {
-            const data = doc.data();
-            const bDate = data.date instanceof Timestamp ? data.date.toDate() : new Date(data.date);
-            return isSameDay(bDate, day);
-          })
-          .map(doc => doc.data().timeSlot);
-
-        let isConflict = false;
-        if (bookedSlots.includes("full")) isConflict = true;
-        else if (slot === "full" && bookedSlots.length > 0) isConflict = true;
-        else if (bookedSlots.includes(slot)) isConflict = true;
-
-        if (isConflict) {
-          alert(`Conflict on ${format(day, "PPP")}: This slot was just reserved. Please adjust your schedule.`);
-          setBookingStep("idle");
-          return;
-        }
-      }
-    } catch (err) {
-      console.error("Integrity Check Error:", err);
-      setBookingStep("idle");
-      return;
-    }
 
     const ref = `#ES-${format(new Date(), "yyyyMMdd")}-${Math.floor(100 + Math.random() * 900)}`;
     setBookingRef(ref);
+    const selectedSchedule = selectedDays.reduce<Record<string, BookingSlot>>((acc, day) => {
+      const key = format(day, "yyyy-MM-dd");
+      acc[key] = dailySlots[key] || "full";
+      return acc;
+    }, {});
+    const pricing = calculatePricing();
 
     try {
-      await addDoc(collection(db, "bookings"), {
+      const payload: CreateBookingPayload = {
         referenceId: ref,
         venueId: venue.id,
         venueName: venue.name,
-        date: selectedDate.from,
-        endDate: selectedDate.to || null,
+        customer: {
+          name: userData.name,
+          email: userData.email,
+          phone: userData.phone,
+        },
+        reservation: {
+          startDate: format(selectedDate.from, "yyyy-MM-dd"),
+          endDate: selectedDate.to ? format(selectedDate.to, "yyyy-MM-dd") : null,
+          dayCount: selectedDays.length,
+          timeSlot: selectedDays.length > 1 ? "custom" : selectedSchedule[format(selectedDate.from, "yyyy-MM-dd")] || "full",
+          dailySchedule: selectedSchedule,
+        },
+        pricing,
+        date: format(selectedDate.from, "yyyy-MM-dd"),
+        endDate: selectedDate.to ? format(selectedDate.to, "yyyy-MM-dd") : null,
         days: selectedDays.length,
-        dailySchedule: dailySlots,
-        timeSlot: selectedDays.length > 1 ? "custom" : dailySlots[format(selectedDate.from, "yyyy-MM-dd")] || "full",
+        dailySchedule: selectedSchedule,
+        timeSlot: selectedDays.length > 1 ? "custom" : selectedSchedule[format(selectedDate.from, "yyyy-MM-dd")] || "full",
         guests: guestCount,
         customerName: userData.name,
         customerEmail: userData.email,
         customerPhone: userData.phone,
-        totalPrice: calculateTotal(),
-        status: "pending",
-        createdAt: serverTimestamp()
+        totalPrice: pricing.totalAmount,
+        website: botTrap,
+      };
+
+      const response = await fetch("/api/bookings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
       });
+
+      const result = (await response.json()) as CreateBookingResponse;
+
+      if (!response.ok || !result.ok) {
+        const message = !result.ok ? result.error : "Unable to complete booking. Please try again.";
+        const errorCode = !result.ok ? result.code : undefined;
+        if (response.status === 409 || errorCode === "SLOT_CONFLICT") {
+          alert(message);
+        } else if (response.status === 429 || errorCode === "BOOKING_RATE_LIMIT" || errorCode === "BOT_DETECTED") {
+          setBookingError(message);
+        } else {
+          setBookingError(message);
+        }
+        setBookingStep("idle");
+        return;
+      }
+
+      setBookingRef(result.referenceId);
       setBookingStep("success");
     } catch (error) {
       console.error("Booking Error:", error);
+      setBookingError("Unable to complete booking. Please try again.");
       setBookingStep("idle");
     }
   };
 
+  const getSlotValue = (value: string): BookingSlot => {
+    if (value === "morning" || value === "evening" || value === "full") return value;
+    return "full";
+  };
   const validate = () => {
     const newErrors: Record<string, string> = {};
     if (!userData.name) newErrors.name = t("val_required");
@@ -233,6 +330,18 @@ export default function VenueDetails() {
       <div className="flex min-h-screen flex-col items-center justify-center bg-white text-black">
         <h1 className="font-serif text-4xl">Venue Not Found</h1>
         <Link href="/" className="mt-4 text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-black transition-colors">{t("details_back")}</Link>
+      </div>
+    );
+  }
+
+  if (isArchived) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-white text-black px-6 text-center">
+        <h1 className="font-serif text-4xl">Venue Archived</h1>
+        <p className="mt-4 max-w-md text-sm text-zinc-500">
+          This venue is no longer available for new bookings, but its booking history is still preserved in admin records.
+        </p>
+        <Link href="/" className="mt-6 text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-black transition-colors">{t("details_back")}</Link>
       </div>
     );
   }
@@ -345,12 +454,12 @@ export default function VenueDetails() {
                             <span className="text-[10px] font-bold text-zinc-900">{format(day, "MMM d")}</span>
                             <select 
                               value={dailySlots[dStr] || "full"}
-                              onChange={(e) => setDailySlots({ ...dailySlots, [dStr]: e.target.value as any })}
+                              onChange={(e) => setDailySlots({ ...dailySlots, [dStr]: getSlotValue(e.target.value) })}
                               className="text-[10px] font-bold uppercase tracking-tight bg-transparent border-none focus:ring-0 p-0 cursor-pointer"
                             >
-                              <option value="full">Full Day</option>
-                              <option value="morning">Morning</option>
-                              <option value="evening">Evening</option>
+                              <option value="full" disabled={!getAvailableSlotsForDate(day).includes("full")}>Full Day</option>
+                              <option value="morning" disabled={!getAvailableSlotsForDate(day).includes("morning")}>Morning</option>
+                              <option value="evening" disabled={!getAvailableSlotsForDate(day).includes("evening")}>Evening</option>
                             </select>
                           </div>
                         );
@@ -420,19 +529,36 @@ export default function VenueDetails() {
                 </div>
               </div>
 
-              <button 
-                onClick={handleStartBooking} 
-                disabled={!selectedDate?.from} 
-                className={`mt-8 w-full py-4 text-xs font-bold uppercase tracking-widest transition-all ${selectedDate?.from ? "bg-black text-white hover:opacity-90 shadow-lg" : "bg-zinc-100 text-zinc-400 cursor-not-allowed"}`}
-              >
-                {t("sidebar_reserve")}
-              </button>
+                <button 
+                  onClick={handleStartBooking} 
+                  disabled={!selectedDate?.from || bookingStep !== "idle"} 
+                  className={`mt-8 w-full py-4 text-xs font-bold uppercase tracking-widest transition-all ${selectedDate?.from && bookingStep === "idle" ? "bg-black text-white hover:opacity-90 shadow-lg" : "bg-zinc-100 text-zinc-400 cursor-not-allowed"}`}
+                >
+                  {t("sidebar_reserve")}
+                </button>
+
+                <div className="sr-only" aria-hidden="true">
+                  <label htmlFor="website">Website</label>
+                  <input
+                    id="website"
+                    name="website"
+                    type="text"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    value={botTrap}
+                    onChange={(e) => setBotTrap(e.target.value)}
+                  />
+                </div>
+
+                {bookingError && (
+                  <p className="mt-4 text-[11px] font-medium text-red-600">{bookingError}</p>
+                )}
 
               <div className="mt-8 space-y-3 pt-6 border-t border-zinc-100">
-                <div className="flex justify-between text-sm text-zinc-500">
-                  <span>Subtotal ({selectedDays.length} Days)</span>
-                  <span className="font-medium text-black">RM {calculateTotal().toLocaleString()}</span>
-                </div>
+                  <div className="flex justify-between text-sm text-zinc-500">
+                    <span>Subtotal ({selectedDays.length} Days)</span>
+                    <span className="font-medium text-black">RM {calculateTotal().toLocaleString()}</span>
+                  </div>
               </div>
             </div>
           </div>
@@ -458,7 +584,7 @@ export default function VenueDetails() {
               </div>
               <div className="flex gap-4">
                 <button onClick={() => setBookingStep("idle")} className="flex-1 border border-zinc-200 py-4 text-xs font-bold uppercase tracking-widest hover:bg-zinc-50 transition-colors">{t("confirm_back")}</button>
-                <button onClick={handleFinalConfirm} className="flex-1 bg-black text-white py-4 text-xs font-bold uppercase tracking-widest hover:opacity-90 shadow-xl">{t("confirm_final")}</button>
+                <button onClick={handleFinalConfirm} disabled={bookingStep === "processing"} className="flex-1 bg-black text-white py-4 text-xs font-bold uppercase tracking-widest hover:opacity-90 shadow-xl disabled:cursor-not-allowed disabled:opacity-60">{t("confirm_final")}</button>
               </div>
             </motion.div>
           </motion.div>

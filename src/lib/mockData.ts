@@ -1,4 +1,6 @@
-import { Timestamp } from "firebase/firestore";
+import { buildBookingDocument, type BookingSlot, type BookingStatus, type BookingTimeSlot } from "@/lib/booking";
+import type { Booking, NormalizableDate } from "@/lib/booking";
+export type { Booking } from "@/lib/booking";
 
 export interface Venue {
   id: string;
@@ -10,25 +12,10 @@ export interface Venue {
   image: string;
   category: "Hall" | "Studio" | "Outdoor" | "Office";
   amenities: string[];
-  createdAt?: Timestamp;
-  updatedAt?: Timestamp;
-}
-
-export interface Booking {
-  id: string;
-  referenceId: string;
-  venueId: string;
-  venueName: string;
-  date: Timestamp | Date | string | null; 
-  endDate?: Timestamp | Date | string | null;
-  timeSlot: "full" | "morning" | "evening" | "custom";
-  guests: number;
-  customerName: string;
-  customerEmail: string;
-  customerPhone: string;
-  totalPrice: number;
-  status: "pending" | "approved" | "rejected";
-  createdAt?: Timestamp;
+  createdAt?: NormalizableDate;
+  updatedAt?: NormalizableDate;
+  isArchived?: boolean;
+  archivedAt?: NormalizableDate;
 }
 
 export const venues: Venue[] = [
@@ -98,4 +85,316 @@ export const venues: Venue[] = [
     category: "Outdoor",
     amenities: ["Panoramic View", "Outdoor Kitchen", "DJ Booth", "Elevator Access", "Glass Pavilion", "Mood Lighting"],
   },
+];
+
+type BookingSeedInput = {
+  id: string;
+  referenceId: string;
+  venueId: string;
+  venueName: string;
+  venuePrice: number;
+  guests: number;
+  customer: {
+    name: string;
+    email: string;
+    phone: string;
+  };
+  reservation: {
+    startDate: string;
+    endDate?: string | null;
+    dayCount: number;
+    timeSlot: BookingTimeSlot;
+    dailySchedule: Record<string, BookingSlot>;
+  };
+  pricing?: {
+    currency?: string;
+    serviceFeeAmount?: number;
+    depositAmount?: number;
+    refundAmount?: number;
+    totalAmount?: number;
+  };
+  status: BookingStatus;
+  createdAt: string;
+  updatedAt?: string;
+  approvedAt?: string;
+  rejectedAt?: string;
+  cancelledAt?: string;
+  statusUpdatedAt?: string;
+  cancelledBy?: "customer" | "admin";
+  cancelReason?: string;
+  rescheduledFromBookingId?: string;
+  replacementBookingId?: string;
+};
+
+const createBookingSeed = (input: BookingSeedInput): Booking => {
+  const createdAt = new Date(input.createdAt);
+  const updatedAt = new Date(input.updatedAt ?? input.statusUpdatedAt ?? input.approvedAt ?? input.rejectedAt ?? input.createdAt);
+  const approvedAt = input.approvedAt ? new Date(input.approvedAt) : undefined;
+  const rejectedAt = input.rejectedAt ? new Date(input.rejectedAt) : undefined;
+  const cancelledAt = input.cancelledAt ? new Date(input.cancelledAt) : undefined;
+  const statusUpdatedAt = new Date(input.statusUpdatedAt ?? input.approvedAt ?? input.rejectedAt ?? input.createdAt);
+
+  const booking = buildBookingDocument(
+    {
+      venueId: input.venueId,
+      venueName: input.venueName,
+      guests: input.guests,
+      customer: input.customer,
+      reservation: input.reservation,
+      pricing: input.pricing,
+      status: input.status,
+    },
+    {
+      venueId: input.venueId,
+      venueName: input.venueName,
+      venuePrice: input.venuePrice,
+      referenceId: input.referenceId,
+      status: input.status,
+      createdAt,
+    }
+  );
+
+  return {
+    id: input.id,
+    ...booking,
+    lifecycle: {
+      ...booking.lifecycle,
+      status: input.status,
+      createdAt,
+      updatedAt,
+      approvedAt,
+      rejectedAt,
+      cancelledAt,
+      statusUpdatedAt,
+      cancelledBy: input.cancelledBy,
+      cancelReason: input.cancelReason,
+      rescheduledFromBookingId: input.rescheduledFromBookingId,
+      replacementBookingId: input.replacementBookingId,
+    },
+    status: input.status,
+    createdAt,
+    updatedAt,
+    approvedAt,
+    rejectedAt,
+    cancelledAt,
+    statusUpdatedAt,
+  };
+};
+
+export const bookings: Booking[] = [
+  createBookingSeed({
+    id: "booking-grand-atrium-launch-2025",
+    referenceId: "#ES-20250318-481",
+    venueId: "1",
+    venueName: "The Grand Atrium",
+    venuePrice: 5000,
+    guests: 220,
+    customer: {
+      name: "Alicia Tan",
+      email: "alicia.tan@northstar.com",
+      phone: "0123456789",
+    },
+    reservation: {
+      startDate: "2025-03-18",
+      endDate: "2025-03-20",
+      dayCount: 3,
+      timeSlot: "custom",
+      dailySchedule: {
+        "2025-03-18": "morning",
+        "2025-03-19": "full",
+        "2025-03-20": "evening",
+      },
+    },
+    pricing: {
+      depositAmount: 2000,
+    },
+    status: "approved",
+    createdAt: "2025-02-08T09:15:00+08:00",
+    approvedAt: "2025-02-10T14:30:00+08:00",
+    statusUpdatedAt: "2025-02-10T14:30:00+08:00",
+  }),
+  createBookingSeed({
+    id: "booking-lumina-workshop-pending-2025",
+    referenceId: "#ES-20250402-214",
+    venueId: "2",
+    venueName: "Lumina Studio",
+    venuePrice: 1500,
+    guests: 32,
+    customer: {
+      name: "Bernard Lee",
+      email: "bernard.lee@kineticmedia.my",
+      phone: "0112233445",
+    },
+    reservation: {
+      startDate: "2025-04-02",
+      endDate: "2025-04-03",
+      dayCount: 2,
+      timeSlot: "custom",
+      dailySchedule: {
+        "2025-04-02": "morning",
+        "2025-04-03": "evening",
+      },
+    },
+    pricing: {
+      depositAmount: 300,
+    },
+    status: "pending",
+    createdAt: "2025-03-11T11:00:00+08:00",
+  }),
+  createBookingSeed({
+    id: "booking-emerald-garden-wedding-rejected-2024",
+    referenceId: "#ES-20241109-673",
+    venueId: "3",
+    venueName: "The Emerald Garden",
+    venuePrice: 3500,
+    guests: 160,
+    customer: {
+      name: "Bernard Lee",
+      email: "bernard.lee@kineticmedia.my",
+      phone: "0112233445",
+    },
+    reservation: {
+      startDate: "2024-11-09",
+      endDate: "2024-11-10",
+      dayCount: 2,
+      timeSlot: "custom",
+      dailySchedule: {
+        "2024-11-09": "full",
+        "2024-11-10": "morning",
+      },
+    },
+    pricing: {
+      depositAmount: 1000,
+      refundAmount: 1000,
+      totalAmount: 0,
+    },
+    status: "rejected",
+    createdAt: "2024-10-01T10:40:00+08:00",
+    rejectedAt: "2024-10-06T16:20:00+08:00",
+    statusUpdatedAt: "2024-10-06T16:20:00+08:00",
+  }),
+  createBookingSeed({
+    id: "booking-emerald-garden-reschedule-cancelled-2025",
+    referenceId: "#ES-20250329-402",
+    venueId: "3",
+    venueName: "The Emerald Garden",
+    venuePrice: 3500,
+    guests: 145,
+    customer: {
+      name: "Alicia Tan",
+      email: "alicia.tan@northstar.com",
+      phone: "0123456789",
+    },
+    reservation: {
+      startDate: "2025-03-29",
+      endDate: "2025-03-30",
+      dayCount: 2,
+      timeSlot: "custom",
+      dailySchedule: {
+        "2025-03-29": "morning",
+        "2025-03-30": "full",
+      },
+    },
+    pricing: {
+      depositAmount: 1000,
+      refundAmount: 7160,
+      totalAmount: 0,
+    },
+    status: "cancelled",
+    createdAt: "2025-02-18T10:15:00+08:00",
+    cancelledAt: "2025-03-12T09:45:00+08:00",
+    statusUpdatedAt: "2025-03-12T09:45:00+08:00",
+    cancelledBy: "customer",
+    cancelReason: "Customer rescheduled to a later date",
+    replacementBookingId: "booking-emerald-garden-reschedule-new-2025",
+  }),
+  createBookingSeed({
+    id: "booking-summit-boardroom-quarterly-2024",
+    referenceId: "#ES-20240912-118",
+    venueId: "4",
+    venueName: "Summit Boardroom",
+    venuePrice: 800,
+    guests: 10,
+    customer: {
+      name: "Nadia Razak",
+      email: "nadia.razak@ascentgroup.my",
+      phone: "0126677889",
+    },
+    reservation: {
+      startDate: "2024-09-12",
+      dayCount: 1,
+      timeSlot: "morning",
+      dailySchedule: {
+        "2024-09-12": "morning",
+      },
+    },
+    pricing: {
+      depositAmount: 200,
+    },
+    status: "approved",
+    createdAt: "2024-08-20T08:45:00+08:00",
+    approvedAt: "2024-08-22T09:10:00+08:00",
+    statusUpdatedAt: "2024-08-22T09:10:00+08:00",
+  }),
+  createBookingSeed({
+    id: "booking-velvet-lounge-refund-2025",
+    referenceId: "#ES-20250214-552",
+    venueId: "5",
+    venueName: "The Velvet Lounge",
+    venuePrice: 2500,
+    guests: 74,
+    customer: {
+      name: "Alicia Tan",
+      email: "alicia.tan@northstar.com",
+      phone: "0123456789",
+    },
+    reservation: {
+      startDate: "2025-02-14",
+      endDate: "2025-02-15",
+      dayCount: 2,
+      timeSlot: "custom",
+      dailySchedule: {
+        "2025-02-14": "full",
+        "2025-02-15": "evening",
+      },
+    },
+    pricing: {
+      depositAmount: 800,
+      refundAmount: 450,
+    },
+    status: "approved",
+    createdAt: "2025-01-05T13:20:00+08:00",
+    approvedAt: "2025-01-08T10:00:00+08:00",
+    statusUpdatedAt: "2025-01-08T10:00:00+08:00",
+  }),
+  createBookingSeed({
+    id: "booking-sky-pavilion-brand-weekend-2025",
+    referenceId: "#ES-20250607-908",
+    venueId: "6",
+    venueName: "Sky Pavilion",
+    venuePrice: 4500,
+    guests: 120,
+    customer: {
+      name: "Alicia Tan",
+      email: "alicia.tan@northstar.com",
+      phone: "0123456789",
+    },
+    reservation: {
+      startDate: "2025-06-07",
+      endDate: "2025-06-08",
+      dayCount: 2,
+      timeSlot: "custom",
+      dailySchedule: {
+        "2025-06-07": "morning",
+        "2025-06-08": "full",
+      },
+    },
+    pricing: {
+      depositAmount: 1500,
+    },
+    status: "approved",
+    createdAt: "2025-05-02T15:50:00+08:00",
+    approvedAt: "2025-05-05T09:25:00+08:00",
+    statusUpdatedAt: "2025-05-05T09:25:00+08:00",
+  }),
 ];

@@ -9,16 +9,21 @@ import {
   doc, 
   addDoc, 
   updateDoc, 
-  deleteDoc,
-  serverTimestamp,
-  Timestamp 
+  serverTimestamp
 } from "firebase/firestore";
 import { Venue } from "@/lib/mockData";
+import { toEpochMs } from "@/lib/bookingNormalization";
+import { isArchivedVenue } from "@/lib/venue";
 
-export function useVenues() {
+type UseVenuesOptions = {
+  includeArchived?: boolean;
+};
+
+export function useVenues(options?: UseVenuesOptions) {
   const [venues, setVenues] = useState<Venue[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasSynced, setHasSynced] = useState(false);
+  const includeArchived = options?.includeArchived ?? false;
 
   useEffect(() => {
     let active = true;
@@ -44,11 +49,18 @@ export function useVenues() {
               id: d.id,
               ...d.data()
             })) as Venue[];
-            
+
+            const visibleData = includeArchived
+              ? data
+              : data.filter((venue) => !isArchivedVenue(venue));
+
             // Manual sort by createdAt if it exists, or ID as fallback
-            const sortedData = [...data].sort((a, b) => {
-              const timeA = a.createdAt instanceof Timestamp ? a.createdAt.seconds : 0;
-              const timeB = b.createdAt instanceof Timestamp ? b.createdAt.seconds : 0;
+            const sortedData = [...visibleData].sort((a, b) => {
+              const archivedA = isArchivedVenue(a) ? 1 : 0;
+              const archivedB = isArchivedVenue(b) ? 1 : 0;
+              if (archivedA !== archivedB) return archivedA - archivedB;
+              const timeA = toEpochMs(a.createdAt);
+              const timeB = toEpochMs(b.createdAt);
               if (timeA !== timeB) return timeB - timeA;
               return b.id.localeCompare(a.id);
             });
@@ -77,13 +89,14 @@ export function useVenues() {
       active = false;
       unsubscribe();
     };
-  }, []);
+  }, [includeArchived]);
 
   const addVenue = async (data: Omit<Venue, "id">) => {
     try {
       await addDoc(collection(db, "venues"), {
         ...data,
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
+        isArchived: false,
       });
       return { success: true };
     } catch (err) {
@@ -106,16 +119,20 @@ export function useVenues() {
     }
   };
 
-  const deleteVenue = async (id: string) => {
+  const archiveVenue = async (id: string) => {
     try {
       const docRef = doc(db, "venues", id);
-      await deleteDoc(docRef);
+      await updateDoc(docRef, {
+        isArchived: true,
+        archivedAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
       return { success: true };
     } catch (err) {
-      console.error("Delete Venue Error:", err);
+      console.error("Archive Venue Error:", err);
       return { success: false, error: err };
     }
   };
 
-  return { venues, loading, hasSynced, addVenue, updateVenue, deleteVenue };
+  return { venues, loading, hasSynced, addVenue, updateVenue, archiveVenue };
 }

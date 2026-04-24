@@ -32,9 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (id: string, pass: string) => {
-    // Admin ID mapping to Email
-    const email = id === "admin" ? "admin@espace.com" : id;
-    await signInWithEmailAndPassword(auth, email, pass);
+    await signInWithEmailAndPassword(auth, id, pass);
   };
 
   const logout = async () => {

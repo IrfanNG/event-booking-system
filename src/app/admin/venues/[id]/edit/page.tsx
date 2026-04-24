@@ -7,7 +7,7 @@ import { Loader2 } from "lucide-react";
 
 export default function EditVenuePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { venues, updateVenue, loading } = useVenues();
+  const { venues, updateVenue, loading } = useVenues({ includeArchived: true });
 
   const venue = venues.find((v) => v.id === id);
 

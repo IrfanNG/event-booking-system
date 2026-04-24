@@ -5,6 +5,8 @@ import { useBookings } from "@/hooks/useBookings";
 import { format } from "date-fns";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { getBookingStatus, normalizeDate } from "@/lib/bookingNormalization";
+import { formatMoney } from "@/lib/finance";
 
 export default function AdminDashboard() {
   const { bookings, loading, stats } = useBookings();
@@ -20,11 +22,12 @@ export default function AdminDashboard() {
       </div>
 
       {/* Stats */}
-      <div className="mb-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4 font-sans">
+      <div className="mb-12 grid gap-8 sm:grid-cols-2 xl:grid-cols-5 font-sans">
         <StatCard label="Total Bookings" value={stats.total.toString()} trend="+Active" />
-        <StatCard label="Revenue (Approved)" value={`RM ${stats.revenue.toLocaleString()}`} trend="Live Sync" />
+        <StatCard label="Revenue (Approved Net)" value={formatMoney(stats.revenue)} trend="Live Sync" subtitle={`Gross ${formatMoney(stats.grossRevenue ?? 0)}`} />
         <StatCard label="Pending" value={stats.pending.toString()} />
         <StatCard label="Rejected" value={stats.rejected.toString()} />
+        <StatCard label="Cancelled" value={stats.cancelled.toString()} />
       </div>
 
       <div className="grid gap-8 lg:grid-cols-3">
@@ -60,14 +63,25 @@ export default function AdminDashboard() {
                   <tr key={b.id}>
                     <td className="px-6 py-4 text-xs font-bold text-black uppercase">{b.referenceId}</td>
                     <td className="px-6 py-4 text-xs font-medium text-black">{b.customerName}</td>
-                    <td className="px-6 py-4 text-xs text-zinc-500">{b.date?.seconds ? format(new Date(b.date.seconds * 1000), "MMM d") : "-"}</td>
+                    <td className="px-6 py-4 text-xs text-zinc-500">
+                      {(() => {
+                        const bookingDate = normalizeDate(b.date);
+                        return bookingDate ? format(bookingDate, "MMM d") : "-";
+                      })()}
+                    </td>
                     <td className="px-6 py-4">
+                      {(() => {
+                        const status = getBookingStatus(b);
+                        return (
                       <span className={`px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider ${
-                        b.status === 'approved' ? 'bg-green-50 text-green-700' : 
-                        b.status === 'pending' ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'
+                        status === "approved" ? "bg-green-50 text-green-700" : 
+                        status === "pending" ? "bg-amber-50 text-amber-700" : 
+                        status === "cancelled" ? "bg-zinc-50 text-zinc-600" : "bg-red-50 text-red-700"
                       }`}>
-                        {b.status}
+                        {status}
                       </span>
+                        );
+                      })()}
                     </td>
                   </tr>
                 ))}
@@ -104,7 +118,7 @@ export default function AdminDashboard() {
   );
 }
 
-function StatCard({ label, value, trend }: { label: string, value: string, trend?: string }) {
+function StatCard({ label, value, trend, subtitle }: { label: string, value: string, trend?: string, subtitle?: string }) {
   return (
     <div className="border-[0.5px] border-zinc-200 bg-white p-6 shadow-sm">
       <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 font-sans">{label}</p>
@@ -112,6 +126,7 @@ function StatCard({ label, value, trend }: { label: string, value: string, trend
         <h3 className="text-3xl font-bold tracking-tight text-black">{value}</h3>
         {trend && <span className="text-[10px] font-bold text-green-600 uppercase tracking-[0.1em]">{trend}</span>}
       </div>
+      {subtitle && <p className="mt-3 text-[10px] font-bold uppercase tracking-widest text-zinc-400">{subtitle}</p>}
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { AdminGuard } from "@/components/admin/AdminGuard";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
+import { isPublicAdminRoute } from "@/lib/adminRoutes";
 
 export default function AdminLayout({
   children,
@@ -15,17 +16,17 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const isPublicAdminRoute = pathname === "/admin/login" || pathname === "/admin/setup";
+  const isPublicRoute = pathname ? isPublicAdminRoute(pathname) : false;
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
     <AuthProvider>
       <AdminGuard>
         <div className="flex min-h-screen bg-zinc-50 text-black">
-          {!isPublicAdminRoute && <AdminSidebar />}
+          {!isPublicRoute && <AdminSidebar />}
           
           <main className="flex-1 overflow-y-auto">
-            {!isPublicAdminRoute && (
+            {!isPublicRoute && (
               <>
                 <header className="flex h-16 items-center justify-between border-b-[0.5px] border-zinc-200 bg-white px-4 lg:px-8 font-sans shrink-0 sticky top-0 z-[200] pointer-events-auto">
                   <div className="flex items-center gap-4">

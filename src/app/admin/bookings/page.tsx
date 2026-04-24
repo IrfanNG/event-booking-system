@@ -1,21 +1,61 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Filter, CheckCircle, XCircle, X, User, Mail, Phone, Calendar, CreditCard, ShieldCheck } from "lucide-react";
 import { useBookings } from "@/hooks/useBookings";
 import { format } from "date-fns";
 import { Booking } from "@/lib/mockData";
+import { getBookingStatus, normalizeDate } from "@/lib/bookingNormalization";
+import { formatMoney, resolveBookingFinance } from "@/lib/finance";
+
+const BOOKINGS_PER_PAGE = 10;
 
 export default function BookingsPage() {
   const { bookings, loading, updateStatus } = useBookings();
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | Booking["status"]>("all");
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
 
-  const filteredBookings = bookings.filter(b => 
-    b.referenceId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    b.customerName?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredBookings = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    return bookings.filter((booking) => {
+      const bookingStatus = getBookingStatus(booking);
+      const statusMatch = statusFilter === "all" || bookingStatus === statusFilter;
+      if (!statusMatch) return false;
+
+      if (!normalizedSearch) return true;
+
+      const fields = [
+        booking.referenceId,
+        booking.customerName,
+        booking.customerEmail,
+        booking.customerPhone,
+        booking.venueName
+      ];
+
+      return fields.some((value) => value?.toLowerCase().includes(normalizedSearch));
+    });
+  }, [bookings, searchTerm, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredBookings.length / BOOKINGS_PER_PAGE));
+
+  const paginatedBookings = useMemo(() => {
+    const startIndex = (currentPage - 1) * BOOKINGS_PER_PAGE;
+    return filteredBookings.slice(startIndex, startIndex + BOOKINGS_PER_PAGE);
+  }, [currentPage, filteredBookings]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const getTimeSlotLabel = (slot: string) => {
     switch (slot) {
@@ -27,6 +67,14 @@ export default function BookingsPage() {
     }
   };
 
+  const getStatusClasses = (status: Booking["status"]) => {
+    const normalizedStatus = getBookingStatus({ status });
+    if (normalizedStatus === "approved") return "bg-green-50 text-green-700 border-[0.5px] border-green-100";
+    if (normalizedStatus === "pending") return "bg-amber-50 text-amber-700 border-[0.5px] border-amber-100";
+    if (normalizedStatus === "cancelled") return "bg-zinc-50 text-zinc-600 border-[0.5px] border-zinc-200";
+    return "bg-red-50 text-red-700 border-[0.5px] border-red-100";
+  };
+
   return (
     <div className="p-8">
       <div className="mb-12 flex items-end justify-between">
@@ -34,21 +82,33 @@ export default function BookingsPage() {
           <h1 className="font-serif text-4xl font-light tracking-tighter text-black">Booking Management</h1>
           <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">Manage all your venue reservations</p>
         </div>
-        <div className="flex gap-4">
-          <div className="flex items-center gap-4 border-[0.5px] border-zinc-200 px-3 py-1.5 bg-white">
-            <input 
-              type="text" 
-              placeholder="Filter by name or Ref ID..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="bg-transparent text-[11px] outline-none w-48 font-bold uppercase tracking-wider text-black placeholder:text-zinc-300" 
-            />
+          <div className="flex gap-4">
+            <div className="flex items-center gap-4 border-[0.5px] border-zinc-200 px-3 py-1.5 bg-white">
+              <input 
+                type="text" 
+                placeholder="Search name, Ref ID, venue..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="bg-transparent text-[11px] outline-none w-48 font-bold uppercase tracking-wider text-black placeholder:text-zinc-300" 
+              />
+            </div>
+            <label className="flex items-center gap-2 border-[0.5px] border-zinc-200 bg-white px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest shadow-sm">
+              <Filter className="h-3 w-3" />
+              <span className="text-zinc-400">Status</span>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as "all" | Booking["status"])}
+                className="bg-transparent text-black outline-none"
+              >
+                <option value="all">All</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </label>
           </div>
-          <button className="flex items-center gap-2 border-[0.5px] border-zinc-200 bg-white px-5 py-2.5 text-[10px] font-bold uppercase tracking-widest transition-all hover:bg-zinc-50 shadow-sm">
-            <Filter className="h-3 w-3" /> Filter Results
-          </button>
         </div>
-      </div>
 
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -77,7 +137,7 @@ export default function BookingsPage() {
                 <tr>
                   <td colSpan={7} className="px-6 py-20 text-center text-xs font-bold uppercase tracking-[0.2em] text-zinc-200">No bookings found.</td>
                 </tr>
-              ) : filteredBookings.map((b) => (
+              ) : paginatedBookings.map((b) => (
                 <tr 
                   key={b.id} 
                   className="group hover:bg-zinc-50 transition-colors cursor-pointer"
@@ -95,21 +155,20 @@ export default function BookingsPage() {
                     <p className="text-[10px] text-zinc-400 font-medium">{b.customerPhone}</p>
                   </td>
                   <td className="px-6 py-5 text-xs font-medium text-zinc-500">
-                    {b.date?.seconds ? format(new Date(b.date.seconds * 1000), "PPP") : "TBD"}
+                    {(() => {
+                      const bookingDate = normalizeDate(b.date);
+                      return bookingDate ? format(bookingDate, "PPP") : "TBD";
+                    })()}
                   </td>
                   <td className="px-6 py-5">
-                    <span className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
-                      b.status === 'approved' ? 'bg-green-50 text-green-700 border-[0.5px] border-green-100' : 
-                      b.status === 'pending' ? 'bg-amber-50 text-amber-700 border-[0.5px] border-amber-100' : 
-                      'bg-red-50 text-red-700 border-[0.5px] border-red-100'
-                    }`}>
-                      {b.status}
+                    <span className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${getStatusClasses(b.status)}`}>
+                      {getBookingStatus(b)}
                     </span>
                   </td>
-                  <td className="px-6 py-5 text-xs font-bold text-black">RM {b.totalPrice?.toLocaleString()}</td>
+                  <td className="px-6 py-5 text-xs font-bold text-black">{formatMoney(resolveBookingFinance(b).netAmount)}</td>
                   <td className="px-6 py-5" onClick={(e) => e.stopPropagation()}>
                     <div className="flex gap-2">
-                      {b.status === "pending" && (
+                      {getBookingStatus(b) === "pending" && (
                         <>
                           <button 
                             onClick={() => updateStatus(b.id, "approved")}
@@ -134,11 +193,25 @@ export default function BookingsPage() {
         </div>
         <div className="flex h-14 items-center justify-between border-t-[0.5px] border-zinc-100 px-6 bg-zinc-50/30">
           <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
-            Total {filteredBookings.length} reservations
+            {filteredBookings.length === 0
+              ? "No reservations"
+              : `Showing ${(currentPage - 1) * BOOKINGS_PER_PAGE + 1}-${Math.min(currentPage * BOOKINGS_PER_PAGE, filteredBookings.length)} of ${filteredBookings.length} reservations`}
           </p>
           <div className="flex gap-6">
-            <button className="text-[10px] font-bold uppercase tracking-widest text-zinc-300 disabled:opacity-50" disabled>Previous</button>
-            <button className="text-[10px] font-bold uppercase tracking-widest text-black hover:opacity-70">Next</button>
+            <button
+              className="text-[10px] font-bold uppercase tracking-widest text-zinc-300 disabled:opacity-50"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+            >
+              Previous
+            </button>
+            <button
+              className="text-[10px] font-bold uppercase tracking-widest text-black hover:opacity-70 disabled:text-zinc-300 disabled:hover:opacity-100"
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+            >
+              Next
+            </button>
           </div>
         </div>
       </motion.div>
@@ -201,13 +274,17 @@ export default function BookingsPage() {
                         <div className="flex justify-between">
                           <span className="text-xs text-zinc-400 font-medium">Date</span>
                           <span className="text-xs font-bold text-black text-right">
-                            {selectedBooking.date?.seconds ? (
-                              selectedBooking.endDate?.seconds ? (
-                                `${format(new Date(selectedBooking.date.seconds * 1000), "MMM d")} - ${format(new Date(selectedBooking.endDate.seconds * 1000), "MMM d, yyyy")}`
-                              ) : (
-                                format(new Date(selectedBooking.date.seconds * 1000), "PPPP")
-                              )
-                            ) : "TBD"}
+                            {(() => {
+                              const startDate = normalizeDate(selectedBooking.date);
+                              const endDate = normalizeDate(selectedBooking.endDate);
+                              if (startDate && endDate) {
+                                return `${format(startDate, "MMM d")} - ${format(endDate, "MMM d, yyyy")}`;
+                              }
+                              if (startDate) {
+                                return format(startDate, "PPPP");
+                              }
+                              return "TBD";
+                            })()}
                           </span>
                         </div>                        <div className="flex justify-between">
                           <span className="text-xs text-zinc-400 font-medium">Time Slot</span>
@@ -227,21 +304,39 @@ export default function BookingsPage() {
                       <h3 className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-6">
                         <CreditCard className="h-3 w-3" /> Financial Audit
                       </h3>
-                      <div className="space-y-4">
-                        <div className="flex justify-between text-[11px] font-medium text-zinc-500">
-                          <span>Base Venue Rate</span>
-                          <span>RM {(selectedBooking.totalPrice / 1.1).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                        </div>
-                        <div className="flex justify-between text-[11px] font-medium text-zinc-500">
-                          <span>Service Fee (10%)</span>
-                          <span>RM {(selectedBooking.totalPrice - (selectedBooking.totalPrice / 1.1)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                        </div>
-                        <div className="h-[0.5px] bg-zinc-200 my-2" />
-                        <div className="flex justify-between text-black font-bold">
-                          <span className="font-serif text-lg">Total Amount</span>
-                          <span className="text-lg">RM {selectedBooking.totalPrice?.toLocaleString()}</span>
-                        </div>
-                      </div>
+                      {(() => {
+                        const finance = resolveBookingFinance(selectedBooking);
+
+                        return (
+                          <div className="space-y-4">
+                            <div className="flex justify-between text-[11px] font-medium text-zinc-500">
+                              <span>Base Venue Rate</span>
+                              <span>{formatMoney(finance.baseAmount)}</span>
+                            </div>
+                            <div className="flex justify-between text-[11px] font-medium text-zinc-500">
+                              <span>Service Fee</span>
+                              <span>{formatMoney(finance.serviceFeeAmount)}</span>
+                            </div>
+                            <div className="flex justify-between text-[11px] font-medium text-zinc-500">
+                              <span>Deposit</span>
+                              <span>{formatMoney(finance.depositAmount)}</span>
+                            </div>
+                            <div className="flex justify-between text-[11px] font-medium text-zinc-500">
+                              <span>Refund</span>
+                              <span>{formatMoney(finance.refundAmount)}</span>
+                            </div>
+                            <div className="h-[0.5px] bg-zinc-200 my-2" />
+                            <div className="flex justify-between text-black font-bold">
+                              <span className="font-serif text-lg">Gross Value</span>
+                              <span className="text-lg">{formatMoney(finance.grossAmount)}</span>
+                            </div>
+                            <div className="flex justify-between text-black font-bold">
+                              <span className="font-serif text-lg">Net Total</span>
+                              <span className="text-lg">{formatMoney(finance.netAmount)}</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     <div className="pt-4">
@@ -251,7 +346,12 @@ export default function BookingsPage() {
                       <div className="space-y-2">
                         <div className="flex justify-between text-[10px]">
                           <span className="text-zinc-400">Submission Time</span>
-                          <span className="font-bold text-zinc-500">{selectedBooking.createdAt?.seconds ? format(new Date(selectedBooking.createdAt.seconds * 1000), "PPP p") : "N/A"}</span>
+                          <span className="font-bold text-zinc-500">
+                            {(() => {
+                              const createdDate = normalizeDate(selectedBooking.createdAt);
+                              return createdDate ? format(createdDate, "PPP p") : "N/A";
+                            })()}
+                          </span>
                         </div>
                         <div className="flex justify-between text-[10px]">
                           <span className="text-zinc-400">Venue ID</span>
@@ -264,7 +364,7 @@ export default function BookingsPage() {
 
                 {/* Footer Actions */}
                 <div className="mt-12 flex gap-4 pt-8 border-t border-zinc-100">
-                  {selectedBooking.status === "pending" ? (
+                  {getBookingStatus(selectedBooking) === "pending" ? (
                     <>
                       <button 
                         onClick={() => {

@@ -1,35 +1,201 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useBookings } from "@/hooks/useBookings";
-import { format } from "date-fns";
+import { eachDayOfInterval, format, parseISO } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Calendar, Clock, ArrowRight, Loader2, Package, CheckCircle2, XCircle, Timer } from "lucide-react";
+import { Search, Calendar, Clock, ArrowRight, Loader2, Package, CheckCircle2, XCircle, Timer, AlertCircle, RotateCcw, Ban } from "lucide-react";
 import Link from "next/link";
+import { Booking } from "@/lib/mockData";
+import { getBookingStatus, normalizeDate } from "@/lib/bookingNormalization";
+import { isValidEmail, isValidLookupPhone } from "@/lib/contactNormalization";
+import { formatMoney, resolveBookingFinance } from "@/lib/finance";
+import { type BookingSlot, type CreateBookingResponse } from "@/lib/booking";
+import { canCancelBooking, canRescheduleBooking } from "@/lib/bookingCancellation";
 
 export default function TrackBookingPage() {
-  const { bookings, loading } = useBookings();
+  const { bookings, getUserBookings, loading } = useBookings();
   
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [filteredBookings, setFilteredBookings] = useState<any[]>([]);
+  const [searchFeedback, setSearchFeedback] = useState("");
+  const [actionBooking, setActionBooking] = useState<Booking | null>(null);
+  const [actionMode, setActionMode] = useState<"cancel" | "reschedule" | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionMessage, setActionMessage] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [rescheduleStartDate, setRescheduleStartDate] = useState("");
+  const [rescheduleEndDate, setRescheduleEndDate] = useState("");
+  const [rescheduleSlot, setRescheduleSlot] = useState<BookingSlot>("full");
+  const [cancelReason, setCancelReason] = useState("");
+
+  const filteredBookings = useMemo(() => {
+    if (!hasSearched) return [];
+    return getUserBookings(email, phone);
+  }, [bookings, email, phone, hasSearched, getUserBookings]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const results = bookings.filter(b => 
-      b.customerEmail?.toLowerCase() === email.toLowerCase() && 
-      b.customerPhone?.replace(/[^0-9]/g, "") === phone.replace(/[^0-9]/g, "")
-    );
-    
-    setFilteredBookings(results);
+    closeAction();
+
+    if (!isValidEmail(email)) {
+      setHasSearched(true);
+      setSearchFeedback("Please enter a valid email address.");
+      return;
+    }
+
+    if (!isValidLookupPhone(phone)) {
+      setHasSearched(true);
+      setSearchFeedback("Please enter a valid phone number.");
+      return;
+    }
+
     setHasSearched(true);
+    setSearchFeedback(
+      getUserBookings(email, phone).length > 0
+        ? ""
+        : "We couldn't find any bookings with those details. Double-check your email and phone number, then try again."
+    );
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
+  const openAction = (booking: Booking, mode: "cancel" | "reschedule") => {
+    setActionBooking(booking);
+    setActionMode(mode);
+    setActionError("");
+    setActionMessage("");
+    if (mode === "reschedule") {
+      const startDate = normalizeDate(booking.date);
+      const endDate = normalizeDate(booking.endDate);
+      setRescheduleStartDate(startDate ? format(startDate, "yyyy-MM-dd") : "");
+      setRescheduleEndDate(endDate ? format(endDate, "yyyy-MM-dd") : "");
+      setRescheduleSlot(booking.timeSlot === "morning" || booking.timeSlot === "evening" || booking.timeSlot === "full" ? booking.timeSlot : "full");
+      setCancelReason("");
+    } else {
+      setCancelReason("");
+    }
+  };
+
+  const closeAction = () => {
+    setActionBooking(null);
+    setActionMode(null);
+    setActionLoading(false);
+    setActionError("");
+    setActionMessage("");
+    setCancelReason("");
+    setRescheduleStartDate("");
+    setRescheduleEndDate("");
+    setRescheduleSlot("full");
+  };
+
+  const buildRescheduleSchedule = () => {
+    if (!rescheduleStartDate) return null;
+
+    const start = parseISO(rescheduleStartDate);
+    if (Number.isNaN(start.getTime())) return null;
+
+    const end = rescheduleEndDate ? parseISO(rescheduleEndDate) : start;
+    if (Number.isNaN(end.getTime()) || end < start) return null;
+
+    return eachDayOfInterval({ start, end }).reduce<Record<string, BookingSlot>>((acc, day) => {
+      acc[format(day, "yyyy-MM-dd")] = rescheduleSlot;
+      return acc;
+    }, {});
+  };
+
+  const handleCancelBooking = async () => {
+    if (!actionBooking) return;
+
+    setActionLoading(true);
+    setActionError("");
+    setActionMessage("");
+
+    try {
+      const response = await fetch(`/api/bookings/${actionBooking.id}/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: actionBooking.customerEmail, phone: actionBooking.customerPhone, reason: cancelReason }),
+      });
+      const result = (await response.json()) as { ok: boolean; error?: string };
+
+      if (!response.ok || !result.ok) {
+        setActionError(result.error ?? "Unable to cancel this booking.");
+        setActionLoading(false);
+        return;
+      }
+
+      setActionMessage("Booking cancelled successfully.");
+      setActionLoading(false);
+    } catch (error) {
+      console.error("Cancel booking error:", error);
+      setActionError("Unable to cancel this booking.");
+      setActionLoading(false);
+    }
+  };
+
+  const handleRescheduleBooking = async () => {
+    if (!actionBooking) return;
+
+    const dailySchedule = buildRescheduleSchedule();
+    if (!dailySchedule) {
+      setActionError("Please choose a valid new date range.");
+      return;
+    }
+
+    setActionLoading(true);
+    setActionError("");
+    setActionMessage("");
+
+    try {
+      const payload = {
+        venueId: actionBooking.venueId,
+        guests: actionBooking.guests,
+        customer: {
+          name: actionBooking.customerName,
+          email: actionBooking.customerEmail,
+          phone: actionBooking.customerPhone,
+        },
+        reservation: {
+          startDate: rescheduleStartDate,
+          endDate: rescheduleEndDate || null,
+          dayCount: Object.keys(dailySchedule).length,
+          timeSlot: Object.keys(dailySchedule).length > 1 ? "custom" : rescheduleSlot,
+          dailySchedule,
+        },
+        date: rescheduleStartDate,
+        endDate: rescheduleEndDate || null,
+        days: Object.keys(dailySchedule).length,
+        dailySchedule,
+        timeSlot: Object.keys(dailySchedule).length > 1 ? "custom" : rescheduleSlot,
+        customerName: actionBooking.customerName,
+        customerEmail: actionBooking.customerEmail,
+        customerPhone: actionBooking.customerPhone,
+      };
+
+      const response = await fetch(`/api/bookings/${actionBooking.id}/reschedule`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = (await response.json()) as CreateBookingResponse & { replacementBookingId?: string };
+
+      if (!response.ok || !result.ok) {
+        setActionError(result.error ?? "Unable to reschedule this booking.");
+        setActionLoading(false);
+        return;
+      }
+
+      setActionMessage(`Replacement booking created: ${result.referenceId}`);
+      setActionLoading(false);
+    } catch (error) {
+      console.error("Reschedule booking error:", error);
+      setActionError("Unable to reschedule this booking.");
+      setActionLoading(false);
+    }
+  };
+
+  const getStatusBadge = (status: Booking["status"]) => {
+    switch (getBookingStatus({ status })) {
       case "approved":
         return (
           <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full border border-emerald-100">
@@ -42,6 +208,13 @@ export default function TrackBookingPage() {
           <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-red-600 bg-red-50 px-2 py-1 rounded-full border border-red-100">
             <XCircle className="h-3.5 w-3.5" />
             Rejected
+          </div>
+        );
+      case "cancelled":
+        return (
+          <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-zinc-500 bg-zinc-50 px-2 py-1 rounded-full border border-zinc-200">
+            <Ban className="h-3.5 w-3.5" />
+            Cancelled
           </div>
         );
       default:
@@ -107,6 +280,13 @@ export default function TrackBookingPage() {
               )}
             </button>
           </form>
+
+          {hasSearched && searchFeedback && (
+            <div className="mt-4 flex items-start gap-2 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>{searchFeedback}</p>
+            </div>
+          )}
         </div>
 
         {/* Results Section */}
@@ -145,15 +325,17 @@ export default function TrackBookingPage() {
                           <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-4 text-sm font-medium text-zinc-500">
                             <div className="flex items-center gap-2">
                               <Calendar className="h-4 w-4 text-zinc-300" />
-                              {booking.date?.toDate ? (
-                                booking.endDate?.toDate ? (
-                                  `${format(booking.date.toDate(), "MMM d")} - ${format(booking.endDate.toDate(), "MMM d, yyyy")}`
-                                ) : (
-                                  format(booking.date.toDate(), "PPP")
-                                )
-                              ) : (
-                                typeof booking.date === 'string' ? booking.date : "TBD"
-                              )}
+                              {(() => {
+                                const startDate = normalizeDate(booking.date);
+                                const endDate = normalizeDate(booking.endDate);
+                                if (startDate && endDate) {
+                                  return `${format(startDate, "MMM d")} - ${format(endDate, "MMM d, yyyy")}`;
+                                }
+                                if (startDate) {
+                                  return format(startDate, "PPP");
+                                }
+                                return typeof booking.date === "string" ? booking.date : "TBD";
+                              })()}
                             </div>
                             <div className="flex items-center gap-2">
                               <Clock className="h-4 w-4 text-zinc-300" />
@@ -167,8 +349,47 @@ export default function TrackBookingPage() {
                         </div>
 
                         <div className="flex flex-col items-end gap-1 border-t md:border-t-0 md:border-l border-zinc-100 pt-6 md:pt-0 md:pl-8">
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Total Paid</span>
-                          <span className="text-2xl font-bold font-serif">RM {booking.totalPrice?.toLocaleString()}</span>
+                          {(() => {
+                            const finance = resolveBookingFinance(booking);
+                            return (
+                              <div className="flex flex-col items-end gap-3">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Net Total</span>
+                                <span className="text-2xl font-bold font-serif">{formatMoney(finance.netAmount)}</span>
+                                <span className="text-[10px] font-medium text-zinc-400 text-right">
+                                  Gross {formatMoney(finance.grossAmount)} · Deposit {formatMoney(finance.depositAmount)} · Refund {formatMoney(finance.refundAmount)}
+                                </span>
+                                {booking.lifecycle?.replacementBookingId && (
+                                  <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 text-right">
+                                    Replacement: {booking.lifecycle.replacementBookingId}
+                                  </span>
+                                )}
+                                {(getBookingStatus(booking) === "pending" || getBookingStatus(booking) === "approved") && (
+                                  <div className="mt-2 flex flex-wrap justify-end gap-2">
+                                    {canCancelBooking(booking) && (
+                                      <button
+                                        type="button"
+                                        onClick={() => openAction(booking, "cancel")}
+                                        className="inline-flex items-center gap-2 border border-zinc-200 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500 transition-colors hover:border-zinc-400 hover:text-black"
+                                      >
+                                        <Ban className="h-3 w-3" />
+                                        Cancel
+                                      </button>
+                                    )}
+                                    {canRescheduleBooking(booking) && (
+                                      <button
+                                        type="button"
+                                        onClick={() => openAction(booking, "reschedule")}
+                                        className="inline-flex items-center gap-2 bg-black px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white transition-colors hover:opacity-90"
+                                      >
+                                        <RotateCcw className="h-3 w-3" />
+                                        Reschedule
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
                     </motion.div>
@@ -192,6 +413,136 @@ export default function TrackBookingPage() {
               <Package className="h-16 w-16 mb-4" />
               <p className="text-xs font-bold uppercase tracking-[0.3em]">Waiting for search...</p>
             </div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {actionBooking && actionMode && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[500] flex items-center justify-center bg-black/50 px-6"
+              onClick={closeAction}
+            >
+              <motion.div
+                initial={{ scale: 0.96, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.96, y: 20 }}
+                className="w-full max-w-2xl bg-white border border-zinc-200 shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between border-b border-zinc-100 px-8 py-6">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-zinc-400">Customer Action</p>
+                    <h3 className="mt-1 font-serif text-2xl tracking-tight">
+                      {actionMode === "cancel" ? "Cancel booking" : "Reschedule booking"}
+                    </h3>
+                  </div>
+                  <button onClick={closeAction} className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+                    Close
+                  </button>
+                </div>
+
+                <div className="grid gap-8 px-8 py-8 md:grid-cols-2">
+                  <div className="space-y-4">
+                    <p className="text-sm font-medium text-zinc-600">
+                      {actionBooking.venueName} · {actionBooking.referenceId}
+                    </p>
+                    <div className="rounded-lg border border-zinc-100 bg-zinc-50 p-4 text-sm text-zinc-600">
+                      {actionMode === "cancel" ? (
+                        <p>
+                          Cancellations follow the public policy window. Refunds depend on how far away the event date is, and the booking will be marked as cancelled.
+                        </p>
+                      ) : (
+                        <p>
+                          Reschedules create a new booking and cancel this one. You need at least 7 days before the event starts.
+                        </p>
+                      )}
+                    </div>
+
+                    {actionMessage && (
+                      <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                        {actionMessage}
+                      </div>
+                    )}
+                    {actionError && (
+                      <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        {actionError}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-4">
+                    {actionMode === "cancel" ? (
+                      <>
+                        <label className="block space-y-2">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Reason</span>
+                          <textarea
+                            value={cancelReason}
+                            onChange={(e) => setCancelReason(e.target.value)}
+                            rows={4}
+                            className="w-full border border-zinc-200 px-4 py-3 text-sm focus:border-black focus:outline-none"
+                            placeholder="Optional reason for cancellation"
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={handleCancelBooking}
+                          disabled={actionLoading}
+                          className="w-full bg-black px-4 py-3 text-[10px] font-bold uppercase tracking-[0.2em] text-white disabled:opacity-50"
+                        >
+                          {actionLoading ? "Processing..." : "Confirm cancellation"}
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <label className="block space-y-2">
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">New start date</span>
+                            <input
+                              type="date"
+                              value={rescheduleStartDate}
+                              onChange={(e) => setRescheduleStartDate(e.target.value)}
+                              className="w-full border border-zinc-200 px-4 py-3 text-sm focus:border-black focus:outline-none"
+                            />
+                          </label>
+                          <label className="block space-y-2">
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">New end date</span>
+                            <input
+                              type="date"
+                              value={rescheduleEndDate}
+                              onChange={(e) => setRescheduleEndDate(e.target.value)}
+                              className="w-full border border-zinc-200 px-4 py-3 text-sm focus:border-black focus:outline-none"
+                            />
+                          </label>
+                        </div>
+                        <label className="block space-y-2">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Daily slot</span>
+                          <select
+                            value={rescheduleSlot}
+                            onChange={(e) => setRescheduleSlot(e.target.value as BookingSlot)}
+                            className="w-full border border-zinc-200 px-4 py-3 text-sm focus:border-black focus:outline-none"
+                          >
+                            <option value="full">Full Day</option>
+                            <option value="morning">Morning</option>
+                            <option value="evening">Evening</option>
+                          </select>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={handleRescheduleBooking}
+                          disabled={actionLoading}
+                          className="w-full bg-black px-4 py-3 text-[10px] font-bold uppercase tracking-[0.2em] text-white disabled:opacity-50"
+                        >
+                          {actionLoading ? "Processing..." : "Create replacement booking"}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
           )}
         </AnimatePresence>
       </main>

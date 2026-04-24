@@ -3,19 +3,19 @@
 import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { isPublicAdminRoute } from "@/lib/adminRoutes";
 
 export function AdminGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const isPublicRoute = pathname ? isPublicAdminRoute(pathname) : false;
 
   useEffect(() => {
-    const isPublicRoute = pathname === "/admin/login" || pathname === "/admin/setup";
-    
     if (!loading && !user && !isPublicRoute) {
-      router.push("/admin/login");
+      router.replace("/admin/login");
     }
-  }, [user, loading, router, pathname]);
+  }, [user, loading, router, isPublicRoute]);
 
   // Show nothing or a skeleton while checking auth
   if (loading) {
@@ -25,8 +25,6 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-
-  const isPublicRoute = pathname === "/admin/login" || pathname === "/admin/setup";
 
   // If on public route, or user is authenticated, render the children
   if (!user && !isPublicRoute) {
