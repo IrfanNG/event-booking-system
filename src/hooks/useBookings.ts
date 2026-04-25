@@ -4,13 +4,30 @@ import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { collection, onSnapshot, query, where, getDocs } from "firebase/firestore";
 import { Booking } from "@/lib/mockData";
-import { getBookingStatus, normalizeBookingRecord, toEpochMs } from "@/lib/bookingNormalization";
+import { getBookingStatus, normalizeBookingRecord, toEpochMs, normalizeDate } from "@/lib/bookingNormalization";
 import { normalizeEmail, normalizePhone } from "@/lib/contactNormalization";
 import { resolveBookingFinance } from "@/lib/finance";
 import { onAuthStateChanged } from "firebase/auth";
 
 function stripUndefined<T extends Record<string, unknown>>(value: T): T {
   return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined)) as T;
+}
+
+/**
+ * Enhanced sort logic to ensure latest bookings always appear at the top.
+ * Primary: createdAt (descending)
+ * Secondary: event date (descending)
+ */
+export function sortBookingsLatestFirst(data: Booking[]): Booking[] {
+  return [...data].sort((a, b) => {
+    const timeA = toEpochMs(a.createdAt);
+    const timeB = toEpochMs(b.createdAt);
+    if (timeB !== timeA) return timeB - timeA;
+
+    const dateA = normalizeDate(a.date)?.getTime() ?? 0;
+    const dateB = normalizeDate(b.date)?.getTime() ?? 0;
+    return dateB - dateA;
+  });
 }
 
 export function useBookings(venueId?: string) {
@@ -43,7 +60,7 @@ export function useBookings(venueId?: string) {
         id: d.id,
         ...d.data(),
       })) as Booking[];
-      setBookings([...data].sort((a, b) => toEpochMs(b.createdAt) - toEpochMs(a.createdAt)));
+      setBookings(sortBookingsLatestFirst(data));
       setLoading(false);
     };
 
@@ -54,7 +71,7 @@ export function useBookings(venueId?: string) {
         const result = await response.json();
         if (result.ok) {
           const data = result.bookings.map((b: any) => normalizeBookingRecord(b)) as Booking[];
-          setBookings([...data].sort((a, b) => toEpochMs(b.createdAt) - toEpochMs(a.createdAt)));
+          setBookings(sortBookingsLatestFirst(data));
         }
       } catch (err: any) {
         console.error("[useBookings] API Fallback failed:", err.message);
@@ -106,7 +123,8 @@ export function useBookings(venueId?: string) {
       const response = await fetch(`/api/bookings/lookup?email=${encodeURIComponent(email)}&phone=${encodeURIComponent(phone)}`);
       const result = await response.json();
       if (result.ok) {
-        return result.bookings as Booking[];
+        // API lookup already returns sorted data, but we sort again here to be safe and consistent
+        return sortBookingsLatestFirst(result.bookings as Booking[]);
       }
       throw new Error(result.error || "Failed to lookup bookings");
     } catch (err) {
@@ -160,20 +178,8 @@ export function useBookings(venueId?: string) {
       (b) =>
         normalizeEmail(b.customer.normalizedEmail || b.customerEmail) === normalizedEmail &&
         normalizePhone(b.customer.normalizedPhone || b.customerPhone) === normalizedPhone
-      )
-      .sort((a, b) => {
-        const priority = (status: string) => {
-          if (status === "pending") return 0;
-          if (status === "approved") return 1;
-          if (status === "cancelled") return 2;
-          return 3;
-        };
-
-        const statusDelta = priority(getBookingStatus(a)) - priority(getBookingStatus(b));
-        if (statusDelta !== 0) return statusDelta;
-
-        return toEpochMs(b.createdAt) - toEpochMs(a.createdAt);
-      });
+      );
+      // Sorting is handled globally by useBookings' effect
   };
 
   const stats = {

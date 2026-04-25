@@ -66,6 +66,16 @@ export async function GET(request: Request) {
         dailySchedule: data.dailySchedule,
         createdAt: data.createdAt,
       };
+    }).sort((a, b) => {
+      // Server-side sort: Latest created first
+      const timeA = normalizeDate(a.createdAt)?.getTime() ?? 0;
+      const timeB = normalizeDate(b.createdAt)?.getTime() ?? 0;
+      if (timeB !== timeA) return timeB - timeA;
+
+      // Fallback: Latest event date first
+      const dateA = normalizeDate(a.date)?.getTime() ?? 0;
+      const dateB = normalizeDate(b.date)?.getTime() ?? 0;
+      return dateB - dateA;
     });
 
     return NextResponse.json({ ok: true, bookings });
