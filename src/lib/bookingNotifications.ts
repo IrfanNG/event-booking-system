@@ -388,6 +388,7 @@ export async function sendBookingNotification(input: BookingNotificationInput): 
   const config = getSmtpConfig();
 
   if (!config) {
+    console.warn("[Notification] SMTP config missing. Skipping email.");
     return {
       event: input.event,
       status: "skipped",
@@ -396,14 +397,17 @@ export async function sendBookingNotification(input: BookingNotificationInput): 
   }
 
   try {
+    console.log(`[Notification] Attempting to send ${input.event} email to: ${input.booking.customer.email || input.booking.customer.normalizedEmail}`);
     const result = await sendSmtpEmail(config, input);
+    console.log(`[Notification] Email sent successfully. MessageID: ${result.messageId}`);
 
     return {
       event: input.event,
       status: result.status,
       messageId: result.messageId,
     };
-  } catch (error) {
+  } catch (error: any) {
+    console.error("[Notification] SMTP Error:", error.message);
     return {
       event: input.event,
       status: "failed",

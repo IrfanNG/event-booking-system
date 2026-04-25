@@ -246,11 +246,17 @@ export async function POST(request: Request) {
 
     const createdBooking = normalizeBookingRecord({ id: docRef.id, ...bookingDocument });
     
-    // Background notification
+    // Background notification with robust logging
     sendBookingNotification({
       event: "created",
       booking: createdBooking,
-    }).catch(err => console.error("[POST /api/bookings] Notification failed:", err));
+    }).then(result => {
+      if (result.status === "sent") {
+        console.log(`[POST /api/bookings] Notification sent: ${result.messageId}`);
+      } else {
+        console.warn(`[POST /api/bookings] Notification ${result.status}: ${result.reason || 'No reason'}`);
+      }
+    }).catch(err => console.error("[POST /api/bookings] Notification fatal error:", err));
 
     console.log("[POST /api/bookings] Success! Reference:", referenceId);
     return NextResponse.json({ ok: true, bookingId: docRef.id, referenceId }, { status: 201 });
