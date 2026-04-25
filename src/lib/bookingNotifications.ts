@@ -75,25 +75,6 @@ const formatBookingDate = (value: unknown) => {
   return date ? format(date, "PPP") : "TBD";
 };
 
-const getScheduleLines = (booking: Booking) => {
-  const entries = Object.entries(booking.reservation.dailySchedule ?? booking.dailySchedule ?? {}).sort(([left], [right]) =>
-    left.localeCompare(right)
-  );
-
-  if (entries.length === 0) {
-    return [formatBookingDate(booking.date)];
-  }
-
-  return entries.map(([day, slot]) => `${formatBookingDate(day)} - ${slotLabels[slot] ?? slot}`);
-};
-
-const describeSchedule = (booking: Booking) => getScheduleLines(booking).join("\n");
-
-const renderScheduleList = (booking: Booking) =>
-  getScheduleLines(booking)
-    .map((line) => `<li style="margin-bottom:8px;">${escapeHtml(line)}</li>`)
-    .join("");
-
 const getTrackUrl = () => {
   const baseUrl = (process.env.APP_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").trim();
   return `${baseUrl.replace(/\/$/, "")}/track`;
@@ -111,9 +92,7 @@ const getSmtpConfig = (): SmtpConfig | null => {
   const host = process.env.SMTP_HOST?.trim();
   const from = process.env.SMTP_FROM_EMAIL?.trim();
 
-  if (!host || !from) {
-    return null;
-  }
+  if (!host || !from) return null;
 
   const parsedPort = Number.parseInt(process.env.SMTP_PORT ?? "", 10);
   const port = Number.isFinite(parsedPort) && parsedPort > 0 ? parsedPort : 587;
@@ -121,9 +100,9 @@ const getSmtpConfig = (): SmtpConfig | null => {
   return {
     host,
     port,
-    secure: process.env.SMTP_SECURE === "true" || port === 465,
+    secure: process.env.SMTP_SECURE === "true",
     user: process.env.SMTP_USER?.trim() || undefined,
-    pass: (process.env.SMTP_PASS?.trim() || "").replace(/\s+/g, ""), // Institutional fix: strip spaces from App Password
+    pass: (process.env.SMTP_PASS?.trim() || "").replace(/\s+/g, ""),
     from: process.env.SMTP_FROM_NAME?.trim() ? `${process.env.SMTP_FROM_NAME.trim()} <${from}>` : from,
     replyTo: process.env.SMTP_REPLY_TO?.trim() || undefined,
     appUrl: getTrackUrl(),
@@ -133,7 +112,7 @@ const getSmtpConfig = (): SmtpConfig | null => {
 const buildSubject = (event: BookingNotificationEvent, booking: Booking) =>
   `${eventSubjects[event]}: ${booking.referenceId}`;
 
-const buildMimeMessage = (input: BookingNotificationInput, config: SmtpConfig, resolvedHost: string) => {
+const buildMimeMessage = (input: BookingNotificationInput, config: SmtpConfig) => {
   const boundary = `booking_${randomUUID().replace(/-/g, "")}`;
   const textBody = buildPlainText(input).replace(/\n/g, "\r\n");
   const htmlBody = buildHtml(input).replace(/\n/g, "\r\n");
@@ -160,37 +139,23 @@ const buildMimeMessage = (input: BookingNotificationInput, config: SmtpConfig, r
     "",
     `--${boundary}--`,
     "",
-  ]
-    .filter((line) => line !== null)
-    .join("\r\n");
+  ].filter(Boolean).join("\r\n");
 };
 
 const readSmtpResponse = (socket: net.Socket | tls.TLSSocket) =>
   new Promise<SmtpResponse>((resolve, reject) => {
     let buffer = "";
-
     const handleData = (chunk: Buffer) => {
       buffer += chunk.toString("utf8");
       const lines = buffer.split(/\r?\n/).filter(Boolean);
-      if (lines.length === 0) {
-        return;
-      }
-
+      if (lines.length === 0) return;
       const lastLine = lines[lines.length - 1];
       const match = lastLine.match(/^(\d{3})([ -])(.*)$/);
-      if (!match || match[2] === "-") {
-        return;
-      }
-
+      if (!match || match[2] === "-") return;
       socket.off("data", handleData);
       socket.off("error", reject);
-      const code = Number.parseInt(match[1], 10);
-      resolve({
-        code,
-        message: lines.join("\n"),
-      });
+      resolve({ code: Number.parseInt(match[1], 10), message: lines.join("\n") });
     };
-
     socket.on("data", handleData);
     socket.on("error", reject);
   });
@@ -200,251 +165,125 @@ const sendSmtpCommand = async (socket: net.Socket | tls.TLSSocket, command: stri
   return readSmtpResponse(socket);
 };
 
-const connectSmtp = (config: SmtpConfig, resolvedIp: string) =>
-  new Promise<net.Socket | tls.TLSSocket>((resolve, reject) => {
-    console.log(`[Notification] Connecting to ${config.host} via ${resolvedIp}:${config.port} (Secure: ${config.secure})`);
-    
-    const options: any = {
-      host: resolvedIp,
-      port: config.port,
-      timeout: 15000,
-    };
-
-    const socket = config.secure
-      ? tls.connect({
-          ...options,
-          servername: config.host, // Crucial for SNI and cert verification
-          rejectUnauthorized: false,
-        })
-      : net.connect(options);
-
-    socket.once("secureConnect", () => {
-      console.log("[Notification] TLS Connection established.");
-      resolve(socket as tls.TLSSocket);
-    });
-    
-    socket.once("connect", () => {
-      if (!config.secure) {
-        console.log("[Notification] TCP Connection established.");
-        resolve(socket);
-      }
-    });
-
-    socket.once("timeout", () => {
-      socket.destroy();
-      reject(new Error("SMTP Connection Timeout (15s)"));
-    });
-
-    socket.once("error", (err) => {
-      console.error("[Notification] Socket Error:", err);
-      reject(err);
+const connectSmtp = async (config: SmtpConfig) => {
+  console.log(`[Notification] Resolving IPv4 for ${config.host}...`);
+  const resolvedIp = await new Promise<string>((resolve, reject) => {
+    dns.lookup(config.host, { family: 4 }, (err, address) => {
+      if (err) reject(err); else resolve(address);
     });
   });
 
-const sendBookingNotification = async (input: BookingNotificationInput): Promise<BookingNotificationResult> => {
-  const config = getSmtpConfig();
+  return new Promise<net.Socket | tls.TLSSocket>((resolve, reject) => {
+    console.log(`[Notification] TCP Connect to ${resolvedIp}:${config.port}...`);
+    const socket = net.connect({ host: resolvedIp, port: config.port, timeout: 15000 });
 
-  if (!config) {
-    console.warn("[Notification] SMTP config missing. Skipping email.");
-    return {
-      event: input.event,
-      status: "skipped",
-      reason: "SMTP configuration is missing.",
-    };
-  }
-
-  try {
-    console.log(`[Notification] Looking up IPv4 for ${config.host}...`);
-    const resolvedIp = await new Promise<string>((resolve, reject) => {
-      dns.lookup(config.host, { family: 4 }, (err, address) => {
-        if (err) reject(err);
-        else resolve(address);
-      });
+    socket.once("connect", () => {
+      console.log("[Notification] TCP connected.");
+      resolve(socket);
     });
-
-    console.log(`[Notification] Resolved IP: ${resolvedIp}. Attempting send...`);
-    const result = await sendSmtpEmail(config, input, resolvedIp);
-    console.log(`[Notification] Email sent successfully. MessageID: ${result.messageId}`);
-
-    return {
-      event: input.event,
-      status: result.status,
-      messageId: result.messageId,
-    };
-  } catch (error: any) {
-    console.error("[Notification] SMTP Fatal Error:", error);
-    return {
-      event: input.event,
-      status: "failed",
-      reason: error instanceof Error ? error.message : "Unknown notification error.",
-    };
-  }
+    socket.once("error", reject);
+    socket.once("timeout", () => { socket.destroy(); reject(new Error("TCP Timeout")); });
+  });
 };
 
-const sendSmtpEmail = async (config: SmtpConfig, input: BookingNotificationInput, resolvedIp: string) => {
-  const socket = await connectSmtp(config, resolvedIp);
+export async function sendBookingNotification(input: BookingNotificationInput): Promise<BookingNotificationResult> {
+  const config = getSmtpConfig();
+  if (!config) return { event: input.event, status: "skipped", reason: "Config missing" };
 
+  let socket: any = null;
   try {
-    const greeting = await readSmtpResponse(socket);
-    console.log("[Notification] Greeting received:", greeting.code);
-    if (greeting.code !== 220) {
-      throw new Error(`SMTP greeting failed: ${greeting.message}`);
+    socket = await connectSmtp(config);
+    
+    // 1. GREETING
+    let res = await readSmtpResponse(socket);
+    if (res.code !== 220) throw new Error(`Greeting failed: ${res.message}`);
+
+    // 2. EHLO
+    res = await sendSmtpCommand(socket, `EHLO ${getEhloName(config.appUrl)}`);
+    if (res.code !== 250) throw new Error(`EHLO failed: ${res.message}`);
+
+    // 3. STARTTLS (if not secure port 465)
+    if (!config.secure && config.port !== 465) {
+      console.log("[Notification] Sending STARTTLS...");
+      res = await sendSmtpCommand(socket, "STARTTLS");
+      if (res.code !== 220) throw new Error(`STARTTLS failed: ${res.message}`);
+
+      socket = tls.connect({
+        socket,
+        servername: config.host,
+        rejectUnauthorized: false
+      });
+      console.log("[Notification] TLS Upgrade complete.");
+      
+      // EHLO again after TLS
+      res = await sendSmtpCommand(socket, `EHLO ${getEhloName(config.appUrl)}`);
+    } else if (config.secure) {
+        // Upgrade immediately for 465
+        socket = tls.connect({ socket, servername: config.host, rejectUnauthorized: false });
     }
 
-    const ehlo = await sendSmtpCommand(socket, `EHLO ${getEhloName(config.appUrl)}`);
-    if (ehlo.code !== 250) {
-      throw new Error(`SMTP EHLO failed: ${ehlo.message}`);
-    }
-
+    // 4. AUTH
     if (config.user && config.pass) {
-      console.log("[Notification] Attempting Auth Login...");
-      const auth = await sendSmtpCommand(socket, "AUTH LOGIN");
-      if (auth.code !== 334) {
-        throw new Error(`SMTP AUTH failed: ${auth.message}`);
-      }
-
-      const userResponse = await sendSmtpCommand(socket, Buffer.from(config.user).toString("base64"));
-      if (userResponse.code !== 334) {
-        throw new Error(`SMTP AUTH username rejected: ${userResponse.message}`);
-      }
-
-      const passResponse = await sendSmtpCommand(socket, Buffer.from(config.pass).toString("base64"));
-      if (passResponse.code !== 235) {
-        throw new Error(`SMTP AUTH password rejected: ${passResponse.message}`);
-      }
-      console.log("[Notification] Auth Success.");
+      console.log("[Notification] AUTH LOGIN...");
+      res = await sendSmtpCommand(socket, "AUTH LOGIN");
+      res = await sendSmtpCommand(socket, Buffer.from(config.user).toString("base64"));
+      res = await sendSmtpCommand(socket, Buffer.from(config.pass).toString("base64"));
+      if (res.code !== 235) throw new Error(`AUTH failed: ${res.message}`);
     }
 
-    const mailFrom = await sendSmtpCommand(socket, `MAIL FROM:<${config.from.match(/<([^>]+)>/)?.[1] ?? config.from}>`);
-    if (mailFrom.code !== 250) {
-      throw new Error(`SMTP MAIL FROM failed: ${mailFrom.message}`);
-    }
+    // 5. MAIL FROM / RCPT TO
+    await sendSmtpCommand(socket, `MAIL FROM:<${config.from.match(/<([^>]+)>/)?.[1] ?? config.from}>`);
+    await sendSmtpCommand(socket, `RCPT TO:<${input.booking.customer.email || input.booking.customer.normalizedEmail}>`);
+    
+    // 6. DATA
+    res = await sendSmtpCommand(socket, "DATA");
+    if (res.code !== 354) throw new Error(`DATA failed: ${res.message}`);
 
-    const rcptTo = await sendSmtpCommand(socket, `RCPT TO:<${input.booking.customer.email || input.booking.customer.normalizedEmail}>`);
-    if (rcptTo.code !== 250 && rcptTo.code !== 251) {
-      throw new Error(`SMTP RCPT TO failed: ${rcptTo.message}`);
-    }
-
-    const data = await sendSmtpCommand(socket, "DATA");
-    if (data.code !== 354) {
-      throw new Error(`SMTP DATA failed: ${data.message}`);
-    }
-
-    const rawMessage = buildMimeMessage(input, config, resolvedIp).replace(/\r?\n\./g, "\r\n..");
-    const body = `${rawMessage}\r\n.\r\n`;
-    socket.write(body);
-    const sent = await readSmtpResponse(socket);
-    if (sent.code !== 250) {
-      throw new Error(`SMTP send failed: ${sent.message}`);
-    }
+    const rawMessage = buildMimeMessage(input, config).replace(/\r?\n\./g, "\r\n..");
+    socket.write(`${rawMessage}\r\n.\r\n`);
+    res = await readSmtpResponse(socket);
+    if (res.code !== 250) throw new Error(`Send failed: ${res.message}`);
 
     await sendSmtpCommand(socket, "QUIT");
+    console.log("[Notification] SUCCESS! Email sent.");
+    return { event: input.event, status: "sent", messageId: res.message };
 
-    return {
-      status: "sent" as const,
-      messageId: sent.message,
-    };
+  } catch (error: any) {
+    console.error("[Notification] SMTP Fatal Error:", error.message);
+    return { event: input.event, status: "failed", reason: error.message };
   } finally {
-    socket.end();
+    if (socket) socket.end();
   }
-};
+}
 
 const buildPlainText = (input: BookingNotificationInput) => {
   const finance = resolveBookingFinance(input.booking);
-  const lines = [
+  const getScheduleLines = (b: Booking) => Object.entries(b.reservation.dailySchedule ?? b.dailySchedule ?? {}).map(([d, s]) => `${formatBookingDate(d)} - ${slotLabels[s] || s}`);
+  
+  return [
     `Hi ${input.booking.customer.name},`,
     "",
-    eventMessages[input.event],
+    eventSubjects[input.event],
+    `Ref: ${input.booking.referenceId}`,
+    `Total: ${formatMoney(finance.netAmount)}`,
     "",
-    `Reference: ${input.booking.referenceId}`,
-    `Venue: ${input.booking.venueName}`,
-    `Status: ${getBookingStatus(input.booking)}`,
-    `Guests: ${input.booking.guests}`,
-    `Schedule:\n${describeSchedule(input.booking)}`,
-    `Total: ${formatMoney(finance.netAmount, finance.currency)}`,
-  ];
-
-  if (input.reason) {
-    lines.push(`Reason: ${input.reason}`);
-  }
-
-  if (input.previousBooking) {
-    lines.push("");
-    lines.push(`Previous booking: ${input.previousBooking.referenceId}`);
-    lines.push(`Previous schedule:\n${describeSchedule(input.previousBooking)}`);
-  }
-
-  if (input.replacementBooking) {
-    const replacementFinance = resolveBookingFinance(input.replacementBooking);
-    lines.push("");
-    lines.push(`Replacement booking: ${input.replacementBooking.referenceId}`);
-    lines.push(`Replacement schedule:\n${describeSchedule(input.replacementBooking)}`);
-    lines.push(`Replacement total: ${formatMoney(replacementFinance.netAmount, replacementFinance.currency)}`);
-  }
-
-  lines.push("");
-  lines.push(`Track your booking: ${getTrackUrl()}`);
-  lines.push("");
-  lines.push("Thank you.");
-
-  return lines.join("\n");
+    `Schedule:\n${getScheduleLines(input.booking).join("\n")}`,
+    "",
+    `Track: ${getTrackUrl()}`
+  ].join("\n");
 };
 
 const buildHtml = (input: BookingNotificationInput) => {
   const finance = resolveBookingFinance(input.booking);
-  const replacementFinance = input.replacementBooking ? resolveBookingFinance(input.replacementBooking) : null;
+  const getScheduleHtml = (b: Booking) => Object.entries(b.reservation.dailySchedule ?? b.dailySchedule ?? {}).map(([d, s]) => `<li>${formatBookingDate(d)}: ${slotLabels[s] || s}</li>`).join("");
 
   return `
-    <div style="font-family: Arial, sans-serif; color: #111827; line-height: 1.6;">
-      <p>Hi ${escapeHtml(input.booking.customer.name)},</p>
-      <p>${escapeHtml(eventMessages[input.event])}</p>
-
-      <div style="border:1px solid #e5e7eb; padding:16px; margin:24px 0; border-radius:8px;">
-        <p><strong>Reference:</strong> ${escapeHtml(input.booking.referenceId)}</p>
-        <p><strong>Venue:</strong> ${escapeHtml(input.booking.venueName)}</p>
-        <p><strong>Status:</strong> ${escapeHtml(getBookingStatus(input.booking))}</p>
-        <p><strong>Guests:</strong> ${input.booking.guests}</p>
-        <p><strong>Schedule:</strong></p>
-        <ul style="padding-left:20px; margin-top:8px;">
-          ${renderScheduleList(input.booking)}
-        </ul>
-        <p><strong>Total:</strong> ${escapeHtml(formatMoney(finance.netAmount, finance.currency))}</p>
-        ${input.reason ? `<p><strong>Reason:</strong> ${escapeHtml(input.reason)}</p>` : ""}
-      </div>
-
-      ${
-        input.previousBooking
-          ? `
-        <div style="border:1px solid #e5e7eb; padding:16px; margin:24px 0; border-radius:8px;">
-          <p><strong>Previous booking:</strong> ${escapeHtml(input.previousBooking.referenceId)}</p>
-          <p><strong>Previous schedule:</strong></p>
-          <ul style="padding-left:20px; margin-top:8px;">
-            ${renderScheduleList(input.previousBooking)}
-          </ul>
-        </div>
-      `
-          : ""
-      }
-
-      ${
-        input.replacementBooking && replacementFinance
-          ? `
-        <div style="border:1px solid #e5e7eb; padding:16px; margin:24px 0; border-radius:8px;">
-          <p><strong>Replacement booking:</strong> ${escapeHtml(input.replacementBooking.referenceId)}</p>
-          <p><strong>Replacement schedule:</strong></p>
-          <ul style="padding-left:20px; margin-top:8px;">
-            ${renderScheduleList(input.replacementBooking)}
-          </ul>
-          <p><strong>Replacement total:</strong> ${escapeHtml(formatMoney(replacementFinance.netAmount, replacementFinance.currency))}</p>
-        </div>
-      `
-          : ""
-      }
-
-      <p><a href="${escapeHtml(getTrackUrl())}" style="color:#111827; text-decoration:underline;">Track your booking</a></p>
-      <p>Thank you.</p>
+    <div style="font-family:sans-serif;">
+      <h2>${eventMessages[input.event]}</h2>
+      <p><strong>Ref:</strong> ${input.booking.referenceId}</p>
+      <ul>${getScheduleHtml(input.booking)}</ul>
+      <p><strong>Total:</strong> ${formatMoney(finance.netAmount)}</p>
+      <a href="${getTrackUrl()}">Track Booking</a>
     </div>
   `;
 };
-
-export { sendBookingNotification };

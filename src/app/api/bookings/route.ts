@@ -246,17 +246,21 @@ export async function POST(request: Request) {
 
     const createdBooking = normalizeBookingRecord({ id: docRef.id, ...bookingDocument });
     
-    // Background notification with robust logging
-    sendBookingNotification({
-      event: "created",
-      booking: createdBooking,
-    }).then(result => {
+    // Explicitly await notification for reliable logging in prod
+    try {
+      console.log("[POST /api/bookings] Triggering notification...");
+      const result = await sendBookingNotification({
+        event: "created",
+        booking: createdBooking,
+      });
       if (result.status === "sent") {
         console.log(`[POST /api/bookings] Notification sent: ${result.messageId}`);
       } else {
         console.warn(`[POST /api/bookings] Notification ${result.status}: ${result.reason || 'No reason'}`);
       }
-    }).catch(err => console.error("[POST /api/bookings] Notification fatal error:", err));
+    } catch (err: any) {
+      console.error("[POST /api/bookings] Notification fatal error:", err.message);
+    }
 
     console.log("[POST /api/bookings] Success! Reference:", referenceId);
     return NextResponse.json({ ok: true, bookingId: docRef.id, referenceId }, { status: 201 });
