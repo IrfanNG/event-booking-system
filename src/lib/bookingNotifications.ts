@@ -76,14 +76,31 @@ const formatBookingDate = (value: unknown) => {
 };
 
 const getTrackUrl = () => {
-  // Priority: APP_URL > NEXT_PUBLIC_SITE_URL > VERCEL_URL > Fallback
-  const baseUrl = (
-    process.env.APP_URL || 
-    process.env.NEXT_PUBLIC_SITE_URL || 
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
-  ).trim();
+  // Logic to detect if we are running in a local dev environment
+  const isLocal = process.env.NODE_ENV === 'development' || !process.env.VERCEL_URL;
+
+  // Priority: 
+  // 1. APP_URL (Manual override)
+  // 2. VERCEL_URL (Auto detection - highest priority in production)
+  // 3. NEXT_PUBLIC_SITE_URL (Publicly exposed fallback)
+  // 4. Localhost (Final fallback)
   
-  const finalUrl = `${baseUrl.replace(/\/$/, "")}/track`;
+  let baseUrl = process.env.APP_URL || "";
+  
+  if (!baseUrl && process.env.VERCEL_URL) {
+    baseUrl = `https://${process.env.VERCEL_URL}`;
+  }
+  
+  if (!baseUrl) {
+    baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  }
+  
+  // Final safeguard: If we got localhost but we know we are in Vercel, force Vercel URL
+  if (baseUrl.includes("localhost") && process.env.VERCEL_URL) {
+    baseUrl = `https://${process.env.VERCEL_URL}`;
+  }
+
+  const finalUrl = `${baseUrl.trim().replace(/\/$/, "")}/track`;
   console.log(`[Notification] Generated Track URL: ${finalUrl}`);
   return finalUrl;
 };
