@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { db } from "@/lib/firebase";
-import { collection, doc, getDoc, onSnapshot, query, updateDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+import { collection, onSnapshot, query } from "firebase/firestore";
 import { Booking } from "@/lib/mockData";
 import { getBookingStatus, normalizeBookingRecord, toEpochMs } from "@/lib/bookingNormalization";
 import { normalizeEmail, normalizePhone } from "@/lib/contactNormalization";
@@ -36,65 +36,30 @@ export function useBookings() {
 
   const updateStatus = async (id: string, status: "approved" | "rejected") => {
     try {
-      const bookingRef = doc(db, "bookings", id);
-      const bookingSnapshot = await getDoc(bookingRef);
-
-      if (!bookingSnapshot.exists()) {
-        const error = { error: "Booking not found." };
-        console.error("Update Status Error:", error);
-        return { success: false, error };
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) {
+        throw new Error("Unauthorized: No active session found.");
       }
 
-      const booking = normalizeBookingRecord({
-        id: bookingSnapshot.id,
-        ...bookingSnapshot.data(),
-      }) as Booking;
-      const currentStatus = getBookingStatus(booking);
-
-      if (currentStatus !== "pending") {
-        const error = { error: "Only pending bookings can be approved or rejected." };
-        console.error("Update Status Error:", error);
-        return { success: false, error };
-      }
-
-      const now = new Date();
-      const bookingUpdates = {
-        status,
-        updatedAt: now,
-        statusUpdatedAt: now,
-        lifecycle: stripUndefined({
-          ...booking.lifecycle,
-          status,
-          updatedAt: now,
-          statusUpdatedAt: now,
-          ...(status === "approved" ? { approvedAt: now } : { rejectedAt: now }),
-        }),
-        ...(status === "approved" ? { approvedAt: now } : { rejectedAt: now }),
-      };
-
-      await updateDoc(bookingRef, bookingUpdates);
-
-      const notificationResponse = await fetch(`/api/bookings/${id}/notify`, {
-        method: "POST",
+      const response = await fetch(`/api/bookings/${id}/status`, {
+        method: "PATCH",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({ event: status }),
+        body: JSON.stringify({ status }),
       });
 
-      const notificationResult = await notificationResponse.json().catch(() => null);
-      if (!notificationResponse.ok) {
-        console.error("Notification Error:", notificationResult);
-      } else if (notificationResult?.notificationStatus === "failed") {
-        console.error("Notification Error:", notificationResult);
-      } else if (notificationResult?.notificationStatus === "skipped") {
-        console.warn("Notification skipped:", notificationResult);
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to update booking status.");
       }
 
-      return { success: true };
+      return { success: true, result };
     } catch (err) {
       console.error("Update Status Error:", err);
-      return { success: false, error: err };
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
     }
   };
 

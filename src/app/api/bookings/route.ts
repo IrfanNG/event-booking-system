@@ -9,7 +9,8 @@ import { isArchivedVenue } from "@/lib/venue";
 import { ACTIVE_BOOKING_STATUSES, getExistingSlotsForDay, hasCollision, type ExistingBookingShape } from "@/lib/bookingAvailability";
 import { sendBookingNotification } from "@/lib/bookingNotifications";
 
-const validSlotSet: Set<BookingSlot> = new Set(["full", "morning", "evening"]);
+import { createBookingSchema } from "@/lib/validation";
+
 const parsedCooldownSeconds = Number.parseInt(process.env.BOOKING_COOLDOWN_SECONDS ?? "", 10);
 const BOOKING_COOLDOWN_MS =
   Number.isFinite(parsedCooldownSeconds) && parsedCooldownSeconds > 0 ? parsedCooldownSeconds * 1000 : 60 * 1000;
@@ -20,10 +21,6 @@ function badRequest(message: string) {
 
 function tooManyRequests(message: string, code: "BOOKING_RATE_LIMIT" | "BOT_DETECTED") {
   return NextResponse.json({ ok: false, error: message, code }, { status: 429 });
-}
-
-function hasHoneypotValue(payload: CreateBookingPayload) {
-  return typeof payload.website === "string" && payload.website.trim().length > 0;
 }
 
 type VenueShape = {
@@ -37,12 +34,24 @@ function createReferenceId() {
 }
 
 export async function POST(request: Request) {
-  let payload: CreateBookingPayload;
+  let body: unknown;
 
   try {
-    payload = (await request.json()) as CreateBookingPayload;
+    body = await request.json();
   } catch {
     return badRequest("Invalid JSON payload.");
+  }
+
+  const result = createBookingSchema.safeParse(body);
+  if (!result.success) {
+    const error = result.error.errors[0];
+    return badRequest(`${error.path.join(".")}: ${error.message}`);
+  }
+
+  const payload = result.data;
+
+  if (payload.website) {
+    return tooManyRequests("Unable to complete booking request.", "BOT_DETECTED");
   }
 
   const customerInput = payload.customer ?? {
@@ -50,6 +59,7 @@ export async function POST(request: Request) {
     email: payload.customerEmail ?? "",
     phone: payload.customerPhone ?? "",
   };
+
   const reservationInput = payload.reservation ?? {
     startDate: payload.date ?? "",
     endDate: payload.endDate ?? null,
@@ -58,43 +68,7 @@ export async function POST(request: Request) {
     dailySchedule: payload.dailySchedule ?? {},
   };
 
-  const requiredStrings: Array<[string, string | undefined | null]> = [
-    ["venueId", payload.venueId],
-    ["startDate", reservationInput.startDate],
-    ["customerName", customerInput.name],
-    ["customerEmail", customerInput.email],
-    ["customerPhone", customerInput.phone],
-  ];
-
-  const missing = requiredStrings.find(([, value]) => typeof value !== "string" || !value.trim());
-  if (missing) return badRequest(`Missing or invalid "${missing[0]}".`);
-
   const venueId = payload.venueId.trim();
-
-  if (!isValidEmail(normalizeEmail(customerInput.email))) {
-    return badRequest("Invalid customerEmail.");
-  }
-
-  if (!normalizePhone(customerInput.phone)) {
-    return badRequest("Invalid customerPhone.");
-  }
-
-  if (!Number.isFinite(payload.guests) || payload.guests < 1) {
-    return badRequest("Invalid guests value.");
-  }
-
-  if (hasHoneypotValue(payload)) {
-    return tooManyRequests("Unable to complete booking request.", "BOT_DETECTED");
-  }
-
-  if (!reservationInput.dailySchedule || typeof reservationInput.dailySchedule !== "object") {
-    return badRequest("Invalid dailySchedule.");
-  }
-
-  const scheduleEntries = Object.entries(reservationInput.dailySchedule);
-  if (scheduleEntries.length === 0) {
-    return badRequest("dailySchedule must include at least one day.");
-  }
 
   const startDate = parseISO(reservationInput.startDate);
   if (Number.isNaN(startDate.getTime())) {
@@ -103,25 +77,25 @@ export async function POST(request: Request) {
 
   if (reservationInput.endDate !== null && reservationInput.endDate !== undefined) {
     const endDateValue = parseISO(reservationInput.endDate);
-    if (Number.isNaN(endDateValue.getTime())) {
-      return badRequest("Invalid endDate.");
-    }
-    if (endDateValue < startDate) {
+    if (!Number.isNaN(endDateValue.getTime()) && endDateValue < startDate) {
       return badRequest("endDate must be on or after startDate.");
     }
   }
 
-  let normalizedSchedule: Record<string, BookingSlot> = {};
+  const scheduleEntries = Object.entries(reservationInput.dailySchedule);
+  if (scheduleEntries.length === 0) {
+    // Attempt to build schedule if missing but startDate provided
+    if (!reservationInput.startDate) {
+        return badRequest("dailySchedule or startDate must be provided.");
+    }
+  }
 
+  let normalizedSchedule: Record<string, BookingSlot> = {};
   for (const [dayKey, slot] of scheduleEntries) {
     const day = parseISO(dayKey);
-    if (Number.isNaN(day.getTime())) {
-      return badRequest(`Invalid schedule day key: "${dayKey}".`);
+    if (!Number.isNaN(day.getTime())) {
+        normalizedSchedule = { ...normalizedSchedule, [format(day, "yyyy-MM-dd")]: slot };
     }
-    if (!validSlotSet.has(slot)) {
-      return badRequest(`Invalid slot "${slot}" for day "${dayKey}".`);
-    }
-    normalizedSchedule = { ...normalizedSchedule, [format(day, "yyyy-MM-dd")]: slot };
   }
 
   try {
