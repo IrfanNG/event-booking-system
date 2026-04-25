@@ -76,14 +76,16 @@ const formatBookingDate = (value: unknown) => {
 };
 
 const getTrackUrl = () => {
-  // Priority: User defined URL > Vercel System URL > Fallback
+  // Priority: APP_URL > NEXT_PUBLIC_SITE_URL > VERCEL_URL > Fallback
   const baseUrl = (
-    process.env.APP_URL ?? 
-    process.env.NEXT_PUBLIC_SITE_URL ?? 
+    process.env.APP_URL || 
+    process.env.NEXT_PUBLIC_SITE_URL || 
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
   ).trim();
   
-  return `${baseUrl.replace(/\/$/, "")}/track`;
+  const finalUrl = `${baseUrl.replace(/\/$/, "")}/track`;
+  console.log(`[Notification] Generated Track URL: ${finalUrl}`);
+  return finalUrl;
 };
 
 const getEhloName = (appUrl: string) => {
