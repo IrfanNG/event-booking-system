@@ -18,6 +18,7 @@ import {
 import { resolveBookingFinance } from "@/lib/finance";
 
 type DateWithSeconds = { seconds: number };
+type DateWithUnderscoreSeconds = { _seconds: number };
 type DateWithToDate = { toDate: () => Date };
 
 const normalizeText = (value: unknown) => (typeof value === "string" ? value.trim() : "");
@@ -41,14 +42,20 @@ export function normalizeDate(value: NormalizableDate): Date | null {
     return isValidDate(value) ? value : null;
   }
 
-  if (typeof value === "object" && value && "toDate" in value && typeof (value as DateWithToDate).toDate === "function") {
-    const parsed = (value as DateWithToDate).toDate();
-    return isValidDate(parsed) ? parsed : null;
-  }
-
-  if (typeof value === "object" && value && "seconds" in value && typeof (value as DateWithSeconds).seconds === "number") {
-    const parsed = new Date((value as DateWithSeconds).seconds * 1000);
-    return isValidDate(parsed) ? parsed : null;
+  // Handle various Firestore Timestamp shapes
+  if (typeof value === "object" && value) {
+    if ("toDate" in value && typeof (value as any).toDate === "function") {
+        const parsed = (value as any).toDate();
+        return isValidDate(parsed) ? parsed : null;
+    }
+    if ("seconds" in value && typeof (value as any).seconds === "number") {
+        const parsed = new Date((value as any).seconds * 1000);
+        return isValidDate(parsed) ? parsed : null;
+    }
+    if ("_seconds" in value && typeof (value as any)._seconds === "number") {
+        const parsed = new Date((value as any)._seconds * 1000);
+        return isValidDate(parsed) ? parsed : null;
+    }
   }
 
   if (typeof value === "string" || typeof value === "number") {
@@ -205,6 +212,10 @@ export function normalizeBookingRecord(booking: BookingRecord | Record<string, u
   const venueName = typeof booking.venueName === "string" ? booking.venueName : "";
   const guests = typeof booking.guests === "number" && Number.isFinite(booking.guests) ? booking.guests : 0;
 
+  // Robust date fallback for stable sorting
+  const createdAt = lifecycle.createdAt || lifecycle.updatedAt || new Date();
+  const updatedAt = lifecycle.updatedAt || createdAt;
+
   return {
     id: typeof booking.id === "string" ? booking.id : "",
     referenceId,
@@ -225,8 +236,8 @@ export function normalizeBookingRecord(booking: BookingRecord | Record<string, u
     customerPhone: customer.phone,
     totalPrice,
     status,
-    createdAt: lifecycle.createdAt,
-    updatedAt: lifecycle.updatedAt,
+    createdAt,
+    updatedAt,
     approvedAt: lifecycle.approvedAt,
     rejectedAt: lifecycle.rejectedAt,
     cancelledAt: lifecycle.cancelledAt,

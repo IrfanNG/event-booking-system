@@ -16,17 +16,23 @@ function stripUndefined<T extends Record<string, unknown>>(value: T): T {
 /**
  * Enhanced sort logic to ensure latest bookings always appear at the top.
  * Primary: createdAt (descending)
- * Secondary: event date (descending)
+ * Secondary: updatedAt (descending)
+ * Tertiary: id (descending) as final tie-breaker
  */
 export function sortBookingsLatestFirst(data: Booking[]): Booking[] {
   return [...data].sort((a, b) => {
     const timeA = toEpochMs(a.createdAt);
     const timeB = toEpochMs(b.createdAt);
+    
     if (timeB !== timeA) return timeB - timeA;
 
-    const dateA = normalizeDate(a.date)?.getTime() ?? 0;
-    const dateB = normalizeDate(b.date)?.getTime() ?? 0;
-    return dateB - dateA;
+    // Fallback to updatedAt if createdAt is the same
+    const updatedA = toEpochMs(a.updatedAt);
+    const updatedB = toEpochMs(b.updatedAt);
+    if (updatedB !== updatedA) return updatedB - updatedA;
+
+    // Final tie-breaker: ID
+    return (b.id || "").localeCompare(a.id || "");
   });
 }
 
