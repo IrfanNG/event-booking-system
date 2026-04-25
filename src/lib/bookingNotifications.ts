@@ -123,7 +123,7 @@ const getSmtpConfig = (): SmtpConfig | null => {
     port,
     secure: process.env.SMTP_SECURE === "true" || port === 465,
     user: process.env.SMTP_USER?.trim() || undefined,
-    pass: process.env.SMTP_PASS?.trim() || undefined,
+    pass: (process.env.SMTP_PASS?.trim() || "").replace(/\s+/g, ""), // Institutional fix: strip spaces from App Password
     from: process.env.SMTP_FROM_NAME?.trim() ? `${process.env.SMTP_FROM_NAME.trim()} <${from}>` : from,
     replyTo: process.env.SMTP_REPLY_TO?.trim() || undefined,
     appUrl: getTrackUrl(),
@@ -133,7 +133,7 @@ const getSmtpConfig = (): SmtpConfig | null => {
 const buildSubject = (event: BookingNotificationEvent, booking: Booking) =>
   `${eventSubjects[event]}: ${booking.referenceId}`;
 
-const buildMimeMessage = (input: BookingNotificationInput, config: SmtpConfig) => {
+const buildMimeMessage = (input: BookingNotificationInput, config: SmtpConfig, resolvedHost: string) => {
   const boundary = `booking_${randomUUID().replace(/-/g, "")}`;
   const textBody = buildPlainText(input).replace(/\n/g, "\r\n");
   const htmlBody = buildHtml(input).replace(/\n/g, "\r\n");
@@ -200,26 +200,20 @@ const sendSmtpCommand = async (socket: net.Socket | tls.TLSSocket, command: stri
   return readSmtpResponse(socket);
 };
 
-const connectSmtp = (config: SmtpConfig) =>
+const connectSmtp = (config: SmtpConfig, resolvedIp: string) =>
   new Promise<net.Socket | tls.TLSSocket>((resolve, reject) => {
-    console.log(`[Notification] Forcing IPv4 for ${config.host}:${config.port}...`);
+    console.log(`[Notification] Connecting to ${config.host} via ${resolvedIp}:${config.port} (Secure: ${config.secure})`);
     
-    // CUSTOM DNS LOOKUP: Force family 4
-    const customLookup = (hostname: string, options: any, cb: any) => {
-      return dns.lookup(hostname, { family: 4 }, cb);
-    };
-
     const options: any = {
-      host: config.host,
+      host: resolvedIp,
       port: config.port,
-      lookup: customLookup,
       timeout: 15000,
     };
 
     const socket = config.secure
       ? tls.connect({
           ...options,
-          servername: config.host,
+          servername: config.host, // Crucial for SNI and cert verification
           rejectUnauthorized: false,
         })
       : net.connect(options);
@@ -260,8 +254,16 @@ const sendBookingNotification = async (input: BookingNotificationInput): Promise
   }
 
   try {
-    console.log(`[Notification] Attempting to send ${input.event} email to: ${input.booking.customer.email || input.booking.customer.normalizedEmail}`);
-    const result = await sendSmtpEmail(config, input);
+    console.log(`[Notification] Looking up IPv4 for ${config.host}...`);
+    const resolvedIp = await new Promise<string>((resolve, reject) => {
+      dns.lookup(config.host, { family: 4 }, (err, address) => {
+        if (err) reject(err);
+        else resolve(address);
+      });
+    });
+
+    console.log(`[Notification] Resolved IP: ${resolvedIp}. Attempting send...`);
+    const result = await sendSmtpEmail(config, input, resolvedIp);
     console.log(`[Notification] Email sent successfully. MessageID: ${result.messageId}`);
 
     return {
@@ -279,8 +281,8 @@ const sendBookingNotification = async (input: BookingNotificationInput): Promise
   }
 };
 
-const sendSmtpEmail = async (config: SmtpConfig, input: BookingNotificationInput) => {
-  const socket = await connectSmtp(config);
+const sendSmtpEmail = async (config: SmtpConfig, input: BookingNotificationInput, resolvedIp: string) => {
+  const socket = await connectSmtp(config, resolvedIp);
 
   try {
     const greeting = await readSmtpResponse(socket);
@@ -328,7 +330,7 @@ const sendSmtpEmail = async (config: SmtpConfig, input: BookingNotificationInput
       throw new Error(`SMTP DATA failed: ${data.message}`);
     }
 
-    const rawMessage = buildMimeMessage(input, config).replace(/\r?\n\./g, "\r\n..");
+    const rawMessage = buildMimeMessage(input, config, resolvedIp).replace(/\r?\n\./g, "\r\n..");
     const body = `${rawMessage}\r\n.\r\n`;
     socket.write(body);
     const sent = await readSmtpResponse(socket);
