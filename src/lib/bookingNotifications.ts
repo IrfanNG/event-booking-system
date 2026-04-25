@@ -201,24 +201,43 @@ const sendSmtpCommand = async (socket: net.Socket | tls.TLSSocket, command: stri
 
 const connectSmtp = (config: SmtpConfig) =>
   new Promise<net.Socket | tls.TLSSocket>((resolve, reject) => {
+    console.log(`[Notification] Connecting to ${config.host}:${config.port} (Secure: ${config.secure})`);
+    
     const socket = config.secure
       ? tls.connect({
           host: config.host,
           port: config.port,
           servername: config.host,
+          rejectUnauthorized: false, // Bypass cert issues for debugging
         })
       : net.connect({
           host: config.host,
           port: config.port,
         });
 
-    socket.once("secureConnect", () => resolve(socket));
+    socket.setTimeout(10000); // 10s timeout
+
+    socket.once("secureConnect", () => {
+      console.log("[Notification] TLS Connection established.");
+      resolve(socket);
+    });
+    
     socket.once("connect", () => {
       if (!config.secure) {
+        console.log("[Notification] TCP Connection established.");
         resolve(socket);
       }
     });
-    socket.once("error", reject);
+
+    socket.once("timeout", () => {
+      socket.destroy();
+      reject(new Error("SMTP Connection Timeout"));
+    });
+
+    socket.once("error", (err) => {
+      console.error("[Notification] Socket Error:", err);
+      reject(err);
+    });
   });
 
 const sendSmtpEmail = async (config: SmtpConfig, input: BookingNotificationInput) => {
@@ -226,6 +245,7 @@ const sendSmtpEmail = async (config: SmtpConfig, input: BookingNotificationInput
 
   try {
     const greeting = await readSmtpResponse(socket);
+    console.log("[Notification] Greeting received:", greeting.code);
     if (greeting.code !== 220) {
       throw new Error(`SMTP greeting failed: ${greeting.message}`);
     }
@@ -236,6 +256,7 @@ const sendSmtpEmail = async (config: SmtpConfig, input: BookingNotificationInput
     }
 
     if (config.user && config.pass) {
+      console.log("[Notification] Attempting Auth Login...");
       const auth = await sendSmtpCommand(socket, "AUTH LOGIN");
       if (auth.code !== 334) {
         throw new Error(`SMTP AUTH failed: ${auth.message}`);
@@ -250,6 +271,7 @@ const sendSmtpEmail = async (config: SmtpConfig, input: BookingNotificationInput
       if (passResponse.code !== 235) {
         throw new Error(`SMTP AUTH password rejected: ${passResponse.message}`);
       }
+      console.log("[Notification] Auth Success.");
     }
 
     const mailFrom = await sendSmtpCommand(socket, `MAIL FROM:<${config.from.match(/<([^>]+)>/)?.[1] ?? config.from}>`);
