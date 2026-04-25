@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { doc, getDoc } from "firebase/firestore";
-import { serverDb } from "@/lib/firebaseServer";
+import { adminDb } from "@/lib/firebaseAdmin";
 import { getBookingStatus, normalizeBookingRecord } from "@/lib/bookingNormalization";
 import { sendBookingNotification, type BookingNotificationEvent } from "@/lib/bookingNotifications";
 
@@ -32,10 +31,14 @@ export async function POST(
   }
 
   try {
-    const bookingRef = doc(serverDb, "bookings", id);
-    const bookingSnapshot = await getDoc(bookingRef);
+    if (!adminDb) {
+      return NextResponse.json({ ok: false, error: "Database not initialized." }, { status: 500 });
+    }
 
-    if (!bookingSnapshot.exists()) {
+    const bookingRef = adminDb.collection("bookings").doc(id);
+    const bookingSnapshot = await bookingRef.get();
+
+    if (!bookingSnapshot.exists) {
       return NextResponse.json({ ok: false, error: "Booking not found." }, { status: 404 });
     }
 
@@ -54,13 +57,12 @@ export async function POST(
     return NextResponse.json({
       ok: true,
       notificationStatus: notification.status,
-      notificationReason: notification.reason,
       event: notification.event,
     });
-  } catch (error) {
-    console.error("POST /api/bookings/[id]/notify error:", error);
+  } catch (error: any) {
+    console.error("POST /api/bookings/[id]/notify error:", error.message);
     return NextResponse.json(
-      { ok: false, error: "Unable to send booking notification right now. Please try again." },
+      { ok: false, error: `Unable to send notification: ${error.message}` },
       { status: 500 }
     );
   }

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { serverDb } from "@/lib/firebaseServer";
+import { adminDb } from "@/lib/firebaseAdmin";
 import { getBookingStatus, normalizeBookingRecord } from "@/lib/bookingNormalization";
 import { sendBookingNotification, type BookingNotificationEvent } from "@/lib/bookingNotifications";
 import { verifyAdminSession } from "@/lib/authServer";
@@ -41,6 +40,10 @@ export async function PATCH(
       return unauthorized();
     }
 
+    if (!adminDb) {
+      return NextResponse.json({ ok: false, error: "Database connection not initialized." }, { status: 500 });
+    }
+
     const { id } = await params;
     let payload: StatusPayload = {};
 
@@ -54,10 +57,10 @@ export async function PATCH(
       return badRequest("Invalid status.");
     }
 
-    const bookingRef = doc(serverDb, "bookings", id);
-    const bookingSnapshot = await getDoc(bookingRef);
+    const bookingRef = adminDb.collection("bookings").doc(id);
+    const bookingSnapshot = await bookingRef.get();
 
-    if (!bookingSnapshot.exists()) {
+    if (!bookingSnapshot.exists) {
       return NextResponse.json({ ok: false, error: "Booking not found." }, { status: 404 });
     }
 
@@ -92,7 +95,7 @@ export async function PATCH(
         : { rejectedAt: now }),
     });
 
-    await updateDoc(bookingRef, bookingUpdates);
+    await bookingRef.update(bookingUpdates);
 
     const updatedBooking = normalizeBookingRecord({
       ...booking,
@@ -113,12 +116,11 @@ export async function PATCH(
       ok: true,
       status: payload.status,
       notificationStatus: notification.status,
-      notificationReason: notification.reason,
     });
-  } catch (error) {
-    console.error("PATCH /api/bookings/[id]/status global error:", error);
+  } catch (error: any) {
+    console.error("PATCH /api/bookings/[id]/status error:", error.message);
     return NextResponse.json(
-      { ok: false, error: "Unable to update booking status right now. Please try again." },
+      { ok: false, error: `Unable to update: ${error.message}` },
       { status: 500 }
     );
   }
