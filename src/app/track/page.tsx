@@ -14,12 +14,15 @@ import { type BookingSlot, type CreateBookingResponse } from "@/lib/booking";
 import { canCancelBooking, canRescheduleBooking } from "@/lib/bookingCancellation";
 
 export default function TrackBookingPage() {
-  const { bookings, getUserBookings, loading } = useBookings();
+  const { findMyBookings } = useBookings();
   
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [userBookings, setUserBookings] = useState<Booking[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const [searchFeedback, setSearchFeedback] = useState("");
+  
   const [actionBooking, setActionBooking] = useState<Booking | null>(null);
   const [actionMode, setActionMode] = useState<"cancel" | "reschedule" | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -30,33 +33,40 @@ export default function TrackBookingPage() {
   const [rescheduleSlot, setRescheduleSlot] = useState<BookingSlot>("full");
   const [cancelReason, setCancelReason] = useState("");
 
-  const filteredBookings = useMemo(() => {
-    if (!hasSearched) return [];
-    return getUserBookings(email, phone);
-  }, [bookings, email, phone, hasSearched, getUserBookings]);
-
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     closeAction();
 
     if (!isValidEmail(email)) {
       setHasSearched(true);
       setSearchFeedback("Please enter a valid email address.");
+      setUserBookings([]);
       return;
     }
 
     if (!isValidLookupPhone(phone)) {
       setHasSearched(true);
       setSearchFeedback("Please enter a valid phone number.");
+      setUserBookings([]);
       return;
     }
 
+    setIsSearching(true);
     setHasSearched(true);
-    setSearchFeedback(
-      getUserBookings(email, phone).length > 0
-        ? ""
-        : "We couldn't find any bookings with those details. Double-check your email and phone number, then try again."
-    );
+    setSearchFeedback("");
+
+    try {
+      const results = await findMyBookings(email, phone);
+      setUserBookings(results);
+      if (results.length === 0) {
+        setSearchFeedback("We couldn't find any bookings with those details. Double-check your email and phone number, then try again.");
+      }
+    } catch (err) {
+      console.error("Search Error:", err);
+      setSearchFeedback("Something went wrong. Please try again later.");
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   const openAction = (booking: Booking, mode: "cancel" | "reschedule") => {
@@ -126,6 +136,9 @@ export default function TrackBookingPage() {
 
       setActionMessage("Booking cancelled successfully.");
       setActionLoading(false);
+      // Refresh list
+      const results = await findMyBookings(email, phone);
+      setUserBookings(results);
     } catch (error) {
       console.error("Cancel booking error:", error);
       setActionError("Unable to cancel this booking.");
@@ -187,6 +200,9 @@ export default function TrackBookingPage() {
 
       setActionMessage(`Replacement booking created: ${result.referenceId}`);
       setActionLoading(false);
+      // Refresh list
+      const results = await findMyBookings(email, phone);
+      setUserBookings(results);
     } catch (error) {
       console.error("Reschedule booking error:", error);
       setActionError("Unable to reschedule this booking.");
@@ -267,10 +283,10 @@ export default function TrackBookingPage() {
             </div>
             <button
               type="submit"
-              disabled={loading}
+              disabled={isSearching}
               className="group flex w-full items-center justify-center gap-2 bg-black py-4 text-xs font-bold uppercase tracking-[0.2em] text-white transition-all hover:opacity-90 disabled:opacity-50"
             >
-              {loading ? (
+              {isSearching ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <>
@@ -291,7 +307,7 @@ export default function TrackBookingPage() {
 
         {/* Results Section */}
         <AnimatePresence mode="wait">
-          {hasSearched ? (
+          {hasSearched && !isSearching ? (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -299,15 +315,15 @@ export default function TrackBookingPage() {
               className="space-y-8"
             >
               <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
-                <h2 className="font-serif text-2xl tracking-tight">Your History ({filteredBookings.length})</h2>
-                {filteredBookings.length > 0 && (
+                <h2 className="font-serif text-2xl tracking-tight">Your History ({userBookings.length})</h2>
+                {userBookings.length > 0 && (
                   <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Showing all records</span>
                 )}
               </div>
 
-              {filteredBookings.length > 0 ? (
+              {userBookings.length > 0 ? (
                 <div className="grid gap-6">
-                  {filteredBookings.map((booking, idx) => (
+                  {userBookings.map((booking, idx) => (
                     <motion.div
                       key={booking.id}
                       initial={{ opacity: 0, x: -10 }}
@@ -408,6 +424,11 @@ export default function TrackBookingPage() {
                 </div>
               )}
             </motion.div>
+          ) : isSearching ? (
+            <div className="flex flex-col items-center justify-center py-20">
+               <Loader2 className="h-12 w-12 animate-spin text-zinc-200 mb-4" />
+               <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-zinc-400">Searching History...</p>
+            </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-20 opacity-20">
               <Package className="h-16 w-16 mb-4" />

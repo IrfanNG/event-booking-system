@@ -2,37 +2,118 @@
 
 import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
-import { collection, onSnapshot, query } from "firebase/firestore";
+import { collection, onSnapshot, query, where, getDocs } from "firebase/firestore";
 import { Booking } from "@/lib/mockData";
 import { getBookingStatus, normalizeBookingRecord, toEpochMs } from "@/lib/bookingNormalization";
 import { normalizeEmail, normalizePhone } from "@/lib/contactNormalization";
 import { resolveBookingFinance } from "@/lib/finance";
+import { onAuthStateChanged } from "firebase/auth";
 
 function stripUndefined<T extends Record<string, unknown>>(value: T): T {
   return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined)) as T;
 }
 
-export function useBookings() {
+export function useBookings(venueId?: string) {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    const q = query(collection(db, "bookings"));
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map((d) => normalizeBookingRecord({
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      setIsAdmin(!!user);
+    });
+    return () => unsubAuth();
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    let unsubscribe = () => {};
+
+    // SECURITY GUARD:
+    // If we don't have a specific venueId and the user isn't an admin,
+    // don't try to fetch all bookings. This avoids permission errors.
+    if (!venueId && !isAdmin) {
+      if (loading) setLoading(false);
+      return;
+    }
+
+    const processSnapshot = (docs: any[]) => {
+      if (!active) return;
+      const data = docs.map((d) => normalizeBookingRecord({
         id: d.id,
         ...d.data(),
       })) as Booking[];
       setBookings([...data].sort((a, b) => toEpochMs(b.createdAt) - toEpochMs(a.createdAt)));
       setLoading(false);
-    }, (error) => {
-      console.error("useBookings Error:", error);
-      setLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
-  }, []);
+    const fetchFromApi = async () => {
+      if (!venueId || !active) return;
+      try {
+        const response = await fetch(`/api/bookings?venueId=${venueId}`);
+        const result = await response.json();
+        if (result.ok) {
+          const data = result.bookings.map((b: any) => normalizeBookingRecord(b)) as Booking[];
+          setBookings([...data].sort((a, b) => toEpochMs(b.createdAt) - toEpochMs(a.createdAt)));
+        }
+      } catch (err: any) {
+        console.error("[useBookings] API Fallback failed:", err.message);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    const startSync = async () => {
+      try {
+        let q = query(collection(db, "bookings"));
+        
+        if (venueId) {
+          q = query(collection(db, "bookings"), where("venueId", "==", venueId));
+        }
+        
+        // Try live sync
+        unsubscribe = onSnapshot(q, (snapshot) => {
+          processSnapshot(snapshot.docs);
+        }, async (error) => {
+          console.warn("[useBookings] onSnapshot failed (likely permissions), falling back to getDocs:", error.message);
+          
+          // Fallback to one-time fetch
+          try {
+            const snapshot = await getDocs(q);
+            processSnapshot(snapshot.docs);
+          } catch (fallbackError: any) {
+            console.warn("[useBookings] getDocs failed, falling back to secure API:", fallbackError.message);
+            // FINAL FALLBACK: Use API to bypass Client SDK permission issues
+            await fetchFromApi();
+          }
+        });
+      } catch (err: any) {
+        console.error("[useBookings] Initialization Error:", err.message);
+        await fetchFromApi();
+      }
+    };
+
+    startSync();
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [venueId, isAdmin]);
+
+  const findMyBookings = async (email: string, phone: string) => {
+    try {
+      const response = await fetch(`/api/bookings/lookup?email=${encodeURIComponent(email)}&phone=${encodeURIComponent(phone)}`);
+      const result = await response.json();
+      if (result.ok) {
+        return result.bookings as Booking[];
+      }
+      throw new Error(result.error || "Failed to lookup bookings");
+    } catch (err) {
+      console.error("Find My Bookings Error:", err);
+      return [];
+    }
+  };
 
   const updateStatus = async (id: string, status: "approved" | "rejected") => {
     try {
@@ -112,5 +193,5 @@ export function useBookings() {
     cancelled: bookings.filter((b) => getBookingStatus(b) === "cancelled").length,
   };
 
-  return { bookings, loading, stats, updateStatus, getVenueBookings, getUserBookings };
+  return { bookings, loading, stats, updateStatus, getVenueBookings, getUserBookings, findMyBookings };
 }

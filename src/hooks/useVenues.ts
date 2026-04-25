@@ -9,7 +9,8 @@ import {
   doc, 
   addDoc, 
   updateDoc, 
-  serverTimestamp
+  serverTimestamp,
+  getDocs
 } from "firebase/firestore";
 import { Venue } from "@/lib/mockData";
 import { toEpochMs } from "@/lib/bookingNormalization";
@@ -29,7 +30,34 @@ export function useVenues(options?: UseVenuesOptions) {
     let active = true;
     let unsubscribe = () => {};
 
-    const startSync = () => {
+    const processSnapshot = (docs: any[]) => {
+      if (!active) return;
+      
+      const data = docs.map(d => ({
+        id: d.id,
+        ...d.data()
+      })) as Venue[];
+
+      const visibleData = includeArchived
+        ? data
+        : data.filter((venue) => !isArchivedVenue(venue));
+
+      const sortedData = [...visibleData].sort((a, b) => {
+        const archivedA = isArchivedVenue(a) ? 1 : 0;
+        const archivedB = isArchivedVenue(b) ? 1 : 0;
+        if (archivedA !== archivedB) return archivedA - archivedB;
+        const timeA = toEpochMs(a.createdAt);
+        const timeB = toEpochMs(b.createdAt);
+        if (timeA !== timeB) return timeB - timeA;
+        return b.id.localeCompare(a.id);
+      });
+
+      setVenues(sortedData);
+      setHasSynced(true);
+      setLoading(false);
+    };
+
+    const startSync = async () => {
       try {
         if (!db) {
           setLoading(false);
@@ -38,48 +66,24 @@ export function useVenues(options?: UseVenuesOptions) {
 
         const q = query(collection(db, "venues"));
         
+        // Try onSnapshot first for live updates
         unsubscribe = onSnapshot(q, (snapshot) => {
-          if (!active) return;
-
-          if (snapshot.empty) {
-            console.warn("[useVenues] Firestore collection 'venues' is empty.");
-            setVenues([]);
-          } else {
-            const data = snapshot.docs.map(d => ({
-              id: d.id,
-              ...d.data()
-            })) as Venue[];
-
-            const visibleData = includeArchived
-              ? data
-              : data.filter((venue) => !isArchivedVenue(venue));
-
-            // Manual sort by createdAt if it exists, or ID as fallback
-            const sortedData = [...visibleData].sort((a, b) => {
-              const archivedA = isArchivedVenue(a) ? 1 : 0;
-              const archivedB = isArchivedVenue(b) ? 1 : 0;
-              if (archivedA !== archivedB) return archivedA - archivedB;
-              const timeA = toEpochMs(a.createdAt);
-              const timeB = toEpochMs(b.createdAt);
-              if (timeA !== timeB) return timeB - timeA;
-              return b.id.localeCompare(a.id);
-            });
-
-            setVenues(sortedData);
-            setHasSynced(true);
-          }
-          setLoading(false);
-        }, (error) => {
-          console.error("[useVenues] Firestore Sync Error:", error);
-          if (active) {
-            setLoading(false);
+          processSnapshot(snapshot.docs);
+        }, async (error) => {
+          console.warn("[useVenues] onSnapshot failed (likely permissions), falling back to getDocs:", error.message);
+          
+          // Fallback to one-time fetch if onSnapshot is blocked
+          try {
+            const snapshot = await getDocs(q);
+            processSnapshot(snapshot.docs);
+          } catch (fallbackError: any) {
+            console.error("[useVenues] All fetch methods failed:", fallbackError.message);
+            if (active) setLoading(false);
           }
         });
-      } catch (err) {
-        console.error("[useVenues] Initialization Error:", err);
-        if (active) {
-          setLoading(false);
-        }
+      } catch (err: any) {
+        console.error("[useVenues] Initialization Error:", err.message);
+        if (active) setLoading(false);
       }
     };
 

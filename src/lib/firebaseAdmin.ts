@@ -14,6 +14,7 @@ const privateKey = formatPrivateKey(process.env.FIREBASE_PRIVATE_KEY);
 if (!admin.apps.length) {
   if (projectId && clientEmail && privateKey && privateKey.includes('BEGIN PRIVATE KEY')) {
     try {
+      console.log("[FirebaseAdmin] Attempting initialization...");
       admin.initializeApp({
         credential: admin.credential.cert({
           projectId,
@@ -21,12 +22,12 @@ if (!admin.apps.length) {
           privateKey,
         }),
       });
-      console.log("Firebase Admin initialized successfully.");
+      console.log("[FirebaseAdmin] Initialized successfully.");
     } catch (error) {
-      console.error('Firebase admin initialization error:', error);
+      console.error('[FirebaseAdmin] Initialization error:', error);
     }
   } else {
-    console.warn("Firebase Admin credentials missing or format invalid. Auth verification will fail gracefully.");
+    console.warn("[FirebaseAdmin] Credentials missing or invalid format.");
   }
 }
 

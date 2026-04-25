@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { serverDb } from "@/lib/firebaseServer";
+import { adminDb } from "@/lib/firebaseAdmin";
 import { calculateCancellationQuote, canCancelBooking } from "@/lib/bookingCancellation";
 import { getBookingStatus, normalizeBookingRecord } from "@/lib/bookingNormalization";
 import { isValidEmail, normalizeEmail, normalizePhone } from "@/lib/contactNormalization";
@@ -39,10 +38,14 @@ export async function POST(
   }
 
   try {
-    const bookingRef = doc(serverDb, "bookings", id);
-    const bookingSnapshot = await getDoc(bookingRef);
+    if (!adminDb) {
+      return NextResponse.json({ ok: false, error: "Database not initialized." }, { status: 500 });
+    }
 
-    if (!bookingSnapshot.exists()) {
+    const bookingRef = adminDb.collection("bookings").doc(id);
+    const bookingSnapshot = await bookingRef.get();
+
+    if (!bookingSnapshot.exists) {
       return NextResponse.json({ ok: false, error: "Booking not found." }, { status: 404 });
     }
 
@@ -70,7 +73,7 @@ export async function POST(
     }
 
     const now = new Date();
-    await updateDoc(bookingRef, {
+    await bookingRef.update({
       status: "cancelled",
       updatedAt: now,
       cancelledAt: now,
@@ -115,10 +118,6 @@ export async function POST(
       reason: payload.reason?.trim() || "Cancelled by customer",
     });
 
-    if (notification.status === "failed") {
-      console.error("Cancellation notification failed:", notification.reason);
-    }
-
     return NextResponse.json({
       ok: true,
       bookingId: booking.id,
@@ -126,12 +125,11 @@ export async function POST(
       retainedAmount: quote.retainedAmount,
       daysUntilStart: quote.daysUntilStart,
       notificationStatus: notification.status,
-      notificationReason: notification.reason,
     });
-  } catch (error) {
-    console.error("POST /api/bookings/[id]/cancel error:", error);
+  } catch (error: any) {
+    console.error("POST /api/bookings/[id]/cancel error:", error.message);
     return NextResponse.json(
-      { ok: false, error: "Unable to cancel the booking right now. Please try again." },
+      { ok: false, error: `Unable to cancel: ${error.message}` },
       { status: 500 }
     );
   }

@@ -19,7 +19,7 @@ import { isInactiveBookingStatus, normalizeDate } from "@/lib/bookingNormalizati
 export default function VenueDetails() {
   const { id } = useParams();
   const { venues, loading: venuesLoading } = useVenues({ includeArchived: true });
-  const { getVenueBookings } = useBookings();
+  const { getVenueBookings } = useBookings(id as string);
   const venue = venues.find((v) => v.id === id);
   const isArchived = venue?.isArchived === true;
   const venueBookings = getVenueBookings(id as string);

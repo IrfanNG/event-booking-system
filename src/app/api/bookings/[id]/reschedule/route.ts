@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, query, updateDoc, where } from "firebase/firestore";
 import { format, parseISO } from "date-fns";
-import { serverDb } from "@/lib/firebaseServer";
+import { adminDb } from "@/lib/firebaseAdmin";
 import {
   buildBookingDocument,
   type BookingSlot,
@@ -9,7 +8,7 @@ import {
 } from "@/lib/booking";
 import { calculateCancellationQuote, canRescheduleBooking } from "@/lib/bookingCancellation";
 import { getBookingStatus, normalizeBookingRecord } from "@/lib/bookingNormalization";
-import { ACTIVE_BOOKING_STATUSES, getExistingSlotsForDay, hasCollision } from "@/lib/bookingAvailability";
+import { ACTIVE_BOOKING_STATUSES, getExistingSlotsForDay, hasCollision, type ExistingBookingShape } from "@/lib/bookingAvailability";
 import { isValidEmail, normalizeEmail, normalizePhone } from "@/lib/contactNormalization";
 import { isArchivedVenue } from "@/lib/venue";
 import { sendBookingNotification } from "@/lib/bookingNotifications";
@@ -91,32 +90,26 @@ export async function POST(
     return badRequest("Invalid date.");
   }
 
-  if (reservationInput.endDate !== null && reservationInput.endDate !== undefined) {
-    const endDateValue = parseISO(reservationInput.endDate);
-    if (Number.isNaN(endDateValue.getTime())) {
-      return badRequest("Invalid endDate.");
-    }
-    if (endDateValue < startDate) {
-      return badRequest("endDate must be on or after startDate.");
-    }
-  }
-
   let normalizedSchedule: Record<string, BookingSlot> = {};
   for (const [dayKey, slot] of scheduleEntries) {
     const day = parseISO(dayKey);
     if (Number.isNaN(day.getTime())) {
       return badRequest(`Invalid schedule day key: "${dayKey}".`);
     }
-    if (!validSlotSet.has(slot)) {
+    if (!validSlotSet.has(slot as BookingSlot)) {
       return badRequest(`Invalid slot "${slot}" for day "${dayKey}".`);
     }
-    normalizedSchedule = { ...normalizedSchedule, [format(day, "yyyy-MM-dd")]: slot };
+    normalizedSchedule[format(day, "yyyy-MM-dd")] = slot as BookingSlot;
   }
 
   try {
-    const bookingRef = doc(serverDb, "bookings", id);
-    const bookingSnapshot = await getDoc(bookingRef);
-    if (!bookingSnapshot.exists()) {
+    if (!adminDb) {
+      return NextResponse.json({ ok: false, error: "Database not initialized." }, { status: 500 });
+    }
+
+    const bookingRef = adminDb.collection("bookings").doc(id);
+    const bookingSnapshot = await bookingRef.get();
+    if (!bookingSnapshot.exists) {
       return NextResponse.json({ ok: false, error: "Booking not found." }, { status: 404 });
     }
 
@@ -142,41 +135,35 @@ export async function POST(
       return NextResponse.json({ ok: false, error: "The replacement booking must use the same venue." }, { status: 400 });
     }
 
-    const venueSnapshot = await getDoc(doc(serverDb, "venues", venueId));
-    if (!venueSnapshot.exists() || isArchivedVenue(venueSnapshot.data() as { isArchived?: boolean })) {
+    const venueDoc = await adminDb.collection("venues").doc(venueId).get();
+    if (!venueDoc.exists || isArchivedVenue(venueDoc.data() as { isArchived?: boolean })) {
       return NextResponse.json({ ok: false, error: "Venue not found." }, { status: 404 });
     }
 
-    const venueData = venueSnapshot.data() as { name?: unknown; price?: unknown; capacity?: unknown };
+    const venueData = venueDoc.data() as { name?: unknown; price?: unknown; capacity?: unknown };
     const venuePrice = typeof venueData.price === "number" && Number.isFinite(venueData.price) ? venueData.price : null;
     const venueName = typeof venueData.name === "string" ? venueData.name.trim() : "";
     const venueCapacity = typeof venueData.capacity === "number" && Number.isFinite(venueData.capacity) ? venueData.capacity : null;
 
-    if (!venuePrice || venuePrice <= 0) {
-      return NextResponse.json({ ok: false, error: "Venue pricing is unavailable." }, { status: 500 });
-    }
-
-    if (!venueName) {
-      return NextResponse.json({ ok: false, error: "Venue data is incomplete." }, { status: 500 });
+    if (!venuePrice || venuePrice <= 0 || !venueName) {
+      return NextResponse.json({ ok: false, error: "Venue pricing or data is unavailable." }, { status: 500 });
     }
 
     const guests = Number.isFinite(payload.guests) && payload.guests > 0 ? payload.guests : booking.guests;
     if (venueCapacity !== null && guests > venueCapacity) {
-      return badRequest("Guest count exceeds venue capacity.");
+      return badRequest(`Guest count exceeds capacity (${venueCapacity}).`);
     }
 
-    const existingQuery = query(
-      collection(serverDb, "bookings"),
-      where("venueId", "==", venueId),
-      where("status", "in", [...ACTIVE_BOOKING_STATUSES])
-    );
-    const existingSnapshot = await getDocs(existingQuery);
+    const existingSnapshot = await adminDb.collection("bookings")
+      .where("venueId", "==", venueId)
+      .where("status", "in", [...ACTIVE_BOOKING_STATUSES])
+      .get();
 
     for (const [dayKey, requestedSlot] of Object.entries(normalizedSchedule)) {
       const requestDay = parseISO(dayKey);
       const existingSlots = existingSnapshot.docs
-        .filter((snapshot) => snapshot.id !== booking.id)
-        .flatMap((snapshot) => getExistingSlotsForDay(snapshot.data() as Record<string, unknown>, requestDay));
+        .filter((snapshot) => snapshot.id !== id)
+        .flatMap((snapshot) => getExistingSlotsForDay(snapshot.data() as ExistingBookingShape, requestDay));
 
       if (hasCollision(existingSlots, requestedSlot)) {
         return NextResponse.json(
@@ -192,7 +179,7 @@ export async function POST(
 
     const normalizedDays = Object.keys(normalizedSchedule).sort();
     const finalTimeSlot: BookingSlot | "custom" =
-      normalizedDays.length > 1 ? "custom" : normalizedSchedule[normalizedDays[0]] ?? "full";
+      normalizedDays.length > 1 ? "custom" : (normalizedSchedule[normalizedDays[0]] as BookingSlot) || "full";
     const referenceId = createReferenceId();
     const quote = calculateCancellationQuote(booking);
     if (!quote) {
@@ -241,15 +228,19 @@ export async function POST(
     );
     newBookingDocument.lifecycle = {
       ...newBookingDocument.lifecycle,
-      rescheduledFromBookingId: booking.id,
+      rescheduledFromBookingId: id,
     };
 
-    const newBookingRef = await addDoc(collection(serverDb, "bookings"), newBookingDocument);
+    const newBookingRef = await adminDb.collection("bookings").add({
+      ...newBookingDocument,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
     const replacementBooking = normalizeBookingRecord({ id: newBookingRef.id, ...newBookingDocument });
 
     try {
       const now = new Date();
-      await updateDoc(bookingRef, {
+      await bookingRef.update({
         status: "cancelled",
         updatedAt: now,
         cancelledAt: now,
@@ -272,37 +263,32 @@ export async function POST(
         }),
       });
     } catch (error) {
-      await deleteDoc(newBookingRef);
+      await newBookingRef.delete();
       throw error;
     }
 
-    const notification = await sendBookingNotification({
+    sendBookingNotification({
       event: "rescheduled",
       booking: replacementBooking,
       previousBooking: booking,
       reason: "Rescheduled by customer",
-    });
-
-    if (notification.status === "failed") {
-      console.error("Reschedule notification failed:", notification.reason);
-    }
+    }).catch(err => console.error("[Reschedule] Notification failed:", err));
 
     return NextResponse.json(
       {
         ok: true,
-        bookingId: booking.id,
+        bookingId: id,
         replacementBookingId: newBookingRef.id,
         referenceId,
         refundAmount: quote.refundAmount,
-        notificationStatus: notification.status,
-        notificationReason: notification.reason,
+        notificationStatus: "sent",
       },
       { status: 201 }
     );
-  } catch (error) {
-    console.error("POST /api/bookings/[id]/reschedule error:", error);
+  } catch (error: any) {
+    console.error("POST /api/bookings/[id]/reschedule error:", error.message);
     return NextResponse.json(
-      { ok: false, error: "Unable to reschedule the booking right now. Please try again." },
+      { ok: false, error: `Unable to reschedule: ${error.message}` },
       { status: 500 }
     );
   }
