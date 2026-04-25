@@ -192,8 +192,9 @@ export default function TrackBookingPage() {
       });
       const result = (await response.json()) as CreateBookingResponse & { replacementBookingId?: string };
 
-      if (!response.ok || !result.ok) {
-        setActionError(result.error ?? "Unable to reschedule this booking.");
+      if (!response.ok || result.ok === false) {
+        const errorMsg = result.ok === false ? result.error : "Unable to reschedule this booking.";
+        setActionError(errorMsg);
         setActionLoading(false);
         return;
       }

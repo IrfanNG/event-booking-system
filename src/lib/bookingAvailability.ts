@@ -1,6 +1,6 @@
 import { isSameDay, format } from "date-fns";
 import { normalizeDate } from "@/lib/bookingNormalization";
-import type { BookingSlot } from "@/lib/booking";
+import type { BookingSlot, NormalizableDate } from "@/lib/booking";
 
 export const ACTIVE_BOOKING_STATUSES = ["pending", "approved"] as const;
 
@@ -48,14 +48,15 @@ export function getExistingSlotsForDay(data: ExistingBookingShape, requestDay: D
 
   if (slots.length > 0) return slots;
 
-  const existingDate = normalizeDate(data.date);
+  const existingDate = normalizeDate(data.date as NormalizableDate);
   if (!existingDate || !isSameDay(existingDate, requestDay)) return slots;
 
   if (data.timeSlot === "full" || data.timeSlot === "morning" || data.timeSlot === "evening") {
-    slots.push(data.timeSlot);
+    slots.push(data.timeSlot as BookingSlot);
   } else if (data.timeSlot === "custom") {
     slots.push("full");
   }
 
   return slots;
 }
+

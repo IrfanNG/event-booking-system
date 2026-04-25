@@ -180,12 +180,12 @@ const normalizeLifecycle = (booking: BookingRecord | Record<string, unknown>): B
 
   return {
     status,
-    createdAt: lifecycle.createdAt ?? booking.createdAt,
-    updatedAt: lifecycle.updatedAt ?? booking.updatedAt,
-    approvedAt: lifecycle.approvedAt ?? booking.approvedAt,
-    rejectedAt: lifecycle.rejectedAt ?? booking.rejectedAt,
-    cancelledAt: lifecycle.cancelledAt ?? booking.cancelledAt,
-    statusUpdatedAt: lifecycle.statusUpdatedAt ?? booking.statusUpdatedAt,
+    createdAt: (lifecycle.createdAt ?? booking.createdAt) as NormalizableDate,
+    updatedAt: (lifecycle.updatedAt ?? booking.updatedAt) as NormalizableDate,
+    approvedAt: (lifecycle.approvedAt ?? booking.approvedAt) as NormalizableDate,
+    rejectedAt: (lifecycle.rejectedAt ?? booking.rejectedAt) as NormalizableDate,
+    cancelledAt: (lifecycle.cancelledAt ?? booking.cancelledAt) as NormalizableDate,
+    statusUpdatedAt: (lifecycle.statusUpdatedAt ?? booking.statusUpdatedAt) as NormalizableDate,
     cancelledBy: lifecycle.cancelledBy === "customer" || lifecycle.cancelledBy === "admin" ? lifecycle.cancelledBy : undefined,
     cancelReason: typeof lifecycle.cancelReason === "string" ? lifecycle.cancelReason : undefined,
     rescheduledFromBookingId: typeof lifecycle.rescheduledFromBookingId === "string" ? lifecycle.rescheduledFromBookingId : undefined,
@@ -240,7 +240,8 @@ export function getBookingStatus(booking: { status?: unknown; lifecycle?: { stat
 
 export function isRejectedBookingStatus(status: unknown): boolean {
   if (isObject(status)) {
-    return normalizeBookingStatus(status.lifecycle?.status ?? status.status) === "rejected";
+    const s = status as any;
+    return normalizeBookingStatus(s.lifecycle?.status ?? s.status) === "rejected";
   }
 
   return normalizeBookingStatus(status) === "rejected";

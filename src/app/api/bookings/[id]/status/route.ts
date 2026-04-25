@@ -19,7 +19,7 @@ function unauthorized() {
 }
 
 function stripUndefined<T extends Record<string, any>>(obj: T): T {
-  const result = { ...obj };
+  const result = { ...obj } as any;
   Object.keys(result).forEach((key) => {
     if (result[key] === undefined) {
       delete result[key];
@@ -27,7 +27,7 @@ function stripUndefined<T extends Record<string, any>>(obj: T): T {
       result[key] = stripUndefined(result[key]);
     }
   });
-  return result;
+  return result as T;
 }
 
 export async function PATCH(

@@ -584,7 +584,7 @@ export default function VenueDetails() {
               </div>
               <div className="flex gap-4">
                 <button onClick={() => setBookingStep("idle")} className="flex-1 border border-zinc-200 py-4 text-xs font-bold uppercase tracking-widest hover:bg-zinc-50 transition-colors">{t("confirm_back")}</button>
-                <button onClick={handleFinalConfirm} disabled={bookingStep === "processing"} className="flex-1 bg-black text-white py-4 text-xs font-bold uppercase tracking-widest hover:opacity-90 shadow-xl disabled:cursor-not-allowed disabled:opacity-60">{t("confirm_final")}</button>
+                <button onClick={handleFinalConfirm} className="flex-1 bg-black text-white py-4 text-xs font-bold uppercase tracking-widest hover:opacity-90 shadow-xl disabled:cursor-not-allowed disabled:opacity-60">{t("confirm_final")}</button>
               </div>
             </motion.div>
           </motion.div>

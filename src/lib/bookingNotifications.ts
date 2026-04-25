@@ -4,7 +4,7 @@ import tls from "node:tls";
 import { randomUUID } from "node:crypto";
 import { formatMoney, resolveBookingFinance } from "@/lib/finance";
 import { getBookingStatus, normalizeDate } from "@/lib/bookingNormalization";
-import type { Booking, BookingSlot } from "@/lib/booking";
+import type { Booking, BookingSlot, NormalizableDate } from "@/lib/booking";
 
 export type BookingNotificationEvent = "created" | "approved" | "rejected" | "cancelled" | "rescheduled";
 
@@ -70,7 +70,7 @@ const escapeHtml = (value: string) =>
     .replace(/'/g, "&#39;");
 
 const formatBookingDate = (value: unknown) => {
-  const date = normalizeDate(value);
+  const date = normalizeDate(value as NormalizableDate);
   return date ? format(date, "PPP") : "TBD";
 };
 
