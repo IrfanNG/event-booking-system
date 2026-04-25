@@ -8,35 +8,34 @@ import { format } from "date-fns";
 import { Booking } from "@/lib/mockData";
 import { getBookingStatus, normalizeDate } from "@/lib/bookingNormalization";
 import { formatMoney, resolveBookingFinance } from "@/lib/finance";
+import { useAdminSearch } from "@/context/AdminSearchContext";
+import { matchesAdminSearch } from "@/lib/adminSearch";
 
 const BOOKINGS_PER_PAGE = 10;
 
 export default function BookingsPage() {
   const { bookings, loading, updateStatus } = useBookings();
-  const [searchTerm, setSearchTerm] = useState("");
+  const { searchTerm } = useAdminSearch();
   const [statusFilter, setStatusFilter] = useState<"all" | Booking["status"]>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
 
   const filteredBookings = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
-
     return bookings.filter((booking) => {
       const bookingStatus = getBookingStatus(booking);
       const statusMatch = statusFilter === "all" || bookingStatus === statusFilter;
       if (!statusMatch) return false;
+      const bookingDate = normalizeDate(booking.date);
 
-      if (!normalizedSearch) return true;
-
-      const fields = [
+      return matchesAdminSearch(searchTerm, [
         booking.referenceId,
         booking.customerName,
         booking.customerEmail,
         booking.customerPhone,
-        booking.venueName
-      ];
-
-      return fields.some((value) => value?.toLowerCase().includes(normalizedSearch));
+        booking.venueName,
+        bookingStatus,
+        bookingDate ? format(bookingDate, "PPP") : null
+      ]);
     });
   }, [bookings, searchTerm, statusFilter]);
 
@@ -82,32 +81,23 @@ export default function BookingsPage() {
           <h1 className="font-serif text-4xl font-light tracking-tighter text-black">Booking Management</h1>
           <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">Manage all your venue reservations</p>
         </div>
-          <div className="flex gap-4">
-            <div className="flex items-center gap-4 border-[0.5px] border-zinc-200 px-3 py-1.5 bg-white">
-              <input 
-                type="text" 
-                placeholder="Search name, Ref ID, venue..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="bg-transparent text-[11px] outline-none w-48 font-bold uppercase tracking-wider text-black placeholder:text-zinc-300" 
-              />
-            </div>
-            <label className="flex items-center gap-2 border-[0.5px] border-zinc-200 bg-white px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest shadow-sm">
-              <Filter className="h-3 w-3" />
-              <span className="text-zinc-400">Status</span>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as "all" | Booking["status"])}
-                className="bg-transparent text-black outline-none"
-              >
-                <option value="all">All</option>
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-            </label>
-          </div>
+        <div className="flex gap-4">
+          <label className="flex items-center gap-2 border-[0.5px] border-zinc-200 bg-white px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest shadow-sm">
+            <Filter className="h-3 w-3" />
+            <span className="text-zinc-400">Status</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as "all" | Booking["status"])}
+              className="bg-transparent text-black outline-none"
+            >
+              <option value="all">All</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </label>
+        </div>
         </div>
 
       <motion.div
@@ -129,15 +119,15 @@ export default function BookingsPage() {
               </tr>
             </thead>
             <tbody className="divide-y-[0.5px] divide-zinc-100">
-              {loading ? (
-                <tr>
-                  <td colSpan={7} className="px-6 py-20 text-center text-xs font-bold uppercase tracking-[0.2em] text-zinc-200">Syncing with Firestore...</td>
-                </tr>
-              ) : filteredBookings.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-6 py-20 text-center text-xs font-bold uppercase tracking-[0.2em] text-zinc-200">No bookings found.</td>
-                </tr>
-              ) : paginatedBookings.map((b) => (
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-20 text-center text-xs font-bold uppercase tracking-[0.2em] text-zinc-200">Syncing with Firestore...</td>
+                  </tr>
+                ) : filteredBookings.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-20 text-center text-xs font-bold uppercase tracking-[0.2em] text-zinc-200">{searchTerm ? "No matching bookings found." : "No bookings found."}</td>
+                  </tr>
+                ) : paginatedBookings.map((b) => (
                 <tr 
                   key={b.id} 
                   className="group hover:bg-zinc-50 transition-colors cursor-pointer"
@@ -197,16 +187,18 @@ export default function BookingsPage() {
               ? "No reservations"
               : `Showing ${(currentPage - 1) * BOOKINGS_PER_PAGE + 1}-${Math.min(currentPage * BOOKINGS_PER_PAGE, filteredBookings.length)} of ${filteredBookings.length} reservations`}
           </p>
-          <div className="flex gap-6">
+          <div className="flex items-center gap-3">
             <button
-              className="text-[10px] font-bold uppercase tracking-widest text-zinc-300 disabled:opacity-50"
+              type="button"
+              className="min-w-24 rounded-full border-[0.5px] border-zinc-200 bg-white px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500 transition-colors hover:border-zinc-300 hover:text-black disabled:cursor-not-allowed disabled:border-zinc-100 disabled:text-zinc-300"
               disabled={currentPage === 1}
               onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
             >
               Previous
             </button>
             <button
-              className="text-[10px] font-bold uppercase tracking-widest text-black hover:opacity-70 disabled:text-zinc-300 disabled:hover:opacity-100"
+              type="button"
+              className="min-w-24 rounded-full bg-black px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-400"
               disabled={currentPage >= totalPages}
               onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
             >

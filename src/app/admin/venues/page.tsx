@@ -1,17 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useVenues } from "@/hooks/useVenues";
 import { Plus, Edit, Trash2, AlertTriangle, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { useAdminSearch } from "@/context/AdminSearchContext";
+import { matchesAdminSearch } from "@/lib/adminSearch";
 
 export default function AdminVenues() {
   const { venues, loading, archiveVenue } = useVenues({ includeArchived: true });
   const [archiveTarget, setArchiveTarget] = useState<string | null>(null);
   const [isArchiving, setIsArchiving] = useState(false);
+  const { searchTerm } = useAdminSearch();
 
   const venueToArchive = venues.find(v => v.id === archiveTarget);
+  const filteredVenues = useMemo(() => {
+    return venues.filter((venue) =>
+      matchesAdminSearch(searchTerm, [
+        venue.name,
+        venue.location,
+        venue.category,
+        venue.capacity,
+        venue.price,
+        venue.isArchived ? "archived" : "active"
+      ])
+    );
+  }, [searchTerm, venues]);
 
   const handleArchive = async () => {
     if (!archiveTarget) return;
@@ -100,9 +115,9 @@ export default function AdminVenues() {
           <tbody className="divide-y-[0.5px] divide-zinc-100">
             {loading ? (
               <tr><td colSpan={5} className="px-6 py-12 text-center text-[10px] font-bold uppercase text-zinc-300 tracking-widest">Syncing Spaces...</td></tr>
-            ) : venues.length === 0 ? (
-              <tr><td colSpan={5} className="px-6 py-12 text-center text-[10px] font-bold uppercase text-zinc-300 tracking-widest">No venues curated yet.</td></tr>
-            ) : venues.map((v) => (
+            ) : filteredVenues.length === 0 ? (
+              <tr><td colSpan={5} className="px-6 py-12 text-center text-[10px] font-bold uppercase text-zinc-300 tracking-widest">{searchTerm ? "No matching venues found." : "No venues curated yet."}</td></tr>
+            ) : filteredVenues.map((v) => (
               <tr key={v.id} className={`group transition-colors ${v.isArchived ? "bg-zinc-50/60 opacity-75" : "hover:bg-zinc-50/50"}`}>
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-4">

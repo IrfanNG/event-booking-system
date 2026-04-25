@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { useBookings } from "@/hooks/useBookings";
 import { format } from "date-fns";
@@ -7,12 +8,30 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { getBookingStatus, normalizeDate } from "@/lib/bookingNormalization";
 import { formatMoney } from "@/lib/finance";
+import { useAdminSearch } from "@/context/AdminSearchContext";
+import { matchesAdminSearch } from "@/lib/adminSearch";
 
 export default function AdminDashboard() {
   const { bookings, loading, stats } = useBookings();
+  const { searchTerm } = useAdminSearch();
 
-  // Show only top 5 recent bookings on dashboard
-  const recentBookings = bookings.slice(0, 5);
+  const recentBookings = useMemo(() => {
+    return bookings
+      .filter((booking) => {
+        const bookingDate = normalizeDate(booking.date);
+
+        return matchesAdminSearch(searchTerm, [
+          booking.referenceId,
+          booking.customerName,
+          booking.customerEmail,
+          booking.customerPhone,
+          booking.venueName,
+          getBookingStatus(booking),
+          bookingDate ? format(bookingDate, "PPP") : null
+        ]);
+      })
+      .slice(0, 5);
+  }, [bookings, searchTerm]);
 
   return (
     <div className="p-8">
@@ -58,7 +77,7 @@ export default function AdminDashboard() {
                 {loading ? (
                   <tr><td colSpan={4} className="px-6 py-12 text-center text-[10px] font-bold uppercase text-zinc-300">Syncing...</td></tr>
                 ) : recentBookings.length === 0 ? (
-                  <tr><td colSpan={4} className="px-6 py-12 text-center text-[10px] font-bold uppercase text-zinc-300">No data found.</td></tr>
+                  <tr><td colSpan={4} className="px-6 py-12 text-center text-[10px] font-bold uppercase text-zinc-300">{searchTerm ? "No matching reservations found." : "No data found."}</td></tr>
                 ) : recentBookings.map((b) => (
                   <tr key={b.id}>
                     <td className="px-6 py-4 text-xs font-bold text-black uppercase">{b.referenceId}</td>
@@ -102,15 +121,6 @@ export default function AdminDashboard() {
             <p className="mt-4 text-[11px] leading-relaxed text-zinc-500">
               The dashboard is currently syncing with the `event-booking-system-25020` database.
             </p>
-          </div>
-          <div className="border-[0.5px] border-zinc-200 bg-white p-6 shadow-sm">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-4">Help Center</p>
-            <p className="text-[11px] leading-relaxed text-zinc-500 mb-4">
-              Need to manage venues or change pricing? Manual updates can be performed in the Firebase Console.
-            </p>
-            <button className="text-[10px] font-bold uppercase tracking-widest text-black underline underline-offset-4">
-              Open Support
-            </button>
           </div>
         </div>
       </div>

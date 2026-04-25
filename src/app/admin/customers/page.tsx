@@ -8,6 +8,8 @@ import { format } from "date-fns";
 import { Booking } from "@/lib/mockData";
 import { normalizeDate, toEpochMs } from "@/lib/bookingNormalization";
 import { resolveBookingFinance } from "@/lib/finance";
+import { useAdminSearch } from "@/context/AdminSearchContext";
+import { matchesAdminSearch } from "@/lib/adminSearch";
 
 interface CustomerSummary {
   email: string;
@@ -21,7 +23,7 @@ interface CustomerSummary {
 
 export default function CustomersPage() {
   const { bookings, loading } = useBookings();
-  const [searchTerm, setSearchTerm] = useState("");
+  const { searchTerm } = useAdminSearch();
   const [tierFilter, setTierFilter] = useState<"all" | "new" | "returning" | "elite">("all");
 
   // Logic to transform bookings into unique customer dossiers
@@ -67,8 +69,6 @@ export default function CustomersPage() {
   };
 
   const filteredCustomers = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
-
     return customers.filter((customer) => {
       const tierMatch =
         tierFilter === "all" ||
@@ -77,11 +77,8 @@ export default function CustomersPage() {
         (tierFilter === "elite" && customer.bookingCount > 2);
 
       if (!tierMatch) return false;
-      if (!normalizedSearch) return true;
 
-      return [customer.name, customer.email, customer.phone].some((value) =>
-        value?.toLowerCase().includes(normalizedSearch)
-      );
+      return matchesAdminSearch(searchTerm, [customer.name, customer.email, customer.phone, customer.bookingCount, customer.totalSpent]);
     });
   }, [customers, searchTerm, tierFilter]);
 
@@ -93,15 +90,6 @@ export default function CustomersPage() {
       </div>
 
       <div className="mb-8 flex flex-wrap gap-4">
-        <div className="flex items-center gap-4 border-[0.5px] border-zinc-200 px-3 py-1.5 bg-white">
-          <input
-            type="text"
-            placeholder="Search client, email, phone..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="bg-transparent text-[11px] outline-none w-56 font-bold uppercase tracking-wider text-black placeholder:text-zinc-300"
-          />
-        </div>
         <label className="flex items-center gap-2 border-[0.5px] border-zinc-200 bg-white px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest shadow-sm">
           <Filter className="h-3 w-3" />
           <span className="text-zinc-400">Tier</span>
@@ -180,7 +168,7 @@ export default function CustomersPage() {
               {loading ? (
                 <tr><td colSpan={6} className="px-6 py-20 text-center text-[10px] font-bold uppercase tracking-widest text-zinc-300">Syncing Intelligence...</td></tr>
               ) : filteredCustomers.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-20 text-center text-[10px] font-bold uppercase tracking-widest text-zinc-300">Database Empty.</td></tr>
+                <tr><td colSpan={6} className="px-6 py-20 text-center text-[10px] font-bold uppercase tracking-widest text-zinc-300">{searchTerm ? "No matching clients found." : "Database Empty."}</td></tr>
               ) : filteredCustomers.map((c) => (
                 <tr key={c.email} className="group hover:bg-zinc-50 transition-colors">
                   <td className="px-6 py-6">
