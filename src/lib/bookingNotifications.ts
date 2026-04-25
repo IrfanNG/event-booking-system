@@ -76,23 +76,16 @@ const formatBookingDate = (value: unknown) => {
 };
 
 const getTrackUrl = () => {
-  // If we are on Vercel, prioritize the Vercel URL directly to avoid localhost issues
-  if (process.env.VERCEL_URL) {
-    const finalUrl = `https://${process.env.VERCEL_URL}/track`;
-    console.log(`[Notification] Production Detected. Using Vercel URL: ${finalUrl}`);
-    return finalUrl;
+  // Logic to detect production
+  const isProduction = process.env.NODE_ENV === "production" || !!process.env.VERCEL;
+
+  if (isProduction) {
+    return "https://event-booking-system-sage.vercel.app/track";
   }
 
-  // Fallback chain for other environments (Local/Custom)
-  const baseUrl = (
-    process.env.APP_URL || 
-    process.env.NEXT_PUBLIC_SITE_URL || 
-    "http://localhost:3000"
-  ).trim();
-  
-  const finalUrl = `${baseUrl.replace(/\/$/, "")}/track`;
-  console.log(`[Notification] Non-Vercel environment. Using: ${finalUrl}`);
-  return finalUrl;
+  // Fallback for Local Dev
+  const baseUrl = (process.env.APP_URL || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").trim();
+  return `${baseUrl.replace(/\/$/, "")}/track`;
 };
 
 const getEhloName = (appUrl: string) => {
