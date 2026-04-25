@@ -1,10 +1,17 @@
 import * as admin from 'firebase-admin';
 
-// Helper to format private key correctly
+// Helper to format private key correctly for OpenSSL 3.0
 const formatPrivateKey = (key: string | undefined) => {
   if (!key) return undefined;
-  // Handle escaped \n strings and ensure no accidental wrapping quotes
-  return key.replace(/\\n/g, '\n').trim(); 
+  
+  // 1. Remove any surrounding double or single quotes that platforms might add
+  let formattedKey = key.replace(/^["']|["']$/g, '');
+  
+  // 2. Handle escaped \n sequences
+  formattedKey = formattedKey.replace(/\\n/g, '\n');
+  
+  // 3. Ensure it starts and ends correctly
+  return formattedKey.trim(); 
 };
 
 const projectId = process.env.FIREBASE_PROJECT_ID;
