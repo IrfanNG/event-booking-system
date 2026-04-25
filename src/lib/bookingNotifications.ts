@@ -1,6 +1,7 @@
 import { format } from "date-fns";
 import net from "node:net";
 import tls from "node:tls";
+import dns from "node:dns";
 import { randomUUID } from "node:crypto";
 import { formatMoney, resolveBookingFinance } from "@/lib/finance";
 import { getBookingStatus, normalizeDate } from "@/lib/bookingNormalization";
@@ -201,25 +202,31 @@ const sendSmtpCommand = async (socket: net.Socket | tls.TLSSocket, command: stri
 
 const connectSmtp = (config: SmtpConfig) =>
   new Promise<net.Socket | tls.TLSSocket>((resolve, reject) => {
-    console.log(`[Notification] Connecting to ${config.host}:${config.port} (Secure: ${config.secure})`);
+    console.log(`[Notification] Forcing IPv4 for ${config.host}:${config.port}...`);
     
+    // CUSTOM DNS LOOKUP: Force family 4
+    const customLookup = (hostname: string, options: any, cb: any) => {
+      return dns.lookup(hostname, { family: 4 }, cb);
+    };
+
+    const options: any = {
+      host: config.host,
+      port: config.port,
+      lookup: customLookup,
+      timeout: 15000,
+    };
+
     const socket = config.secure
       ? tls.connect({
-          host: config.host,
-          port: config.port,
+          ...options,
           servername: config.host,
-          rejectUnauthorized: false, // Bypass cert issues for debugging
+          rejectUnauthorized: false,
         })
-      : net.connect({
-          host: config.host,
-          port: config.port,
-        });
-
-    socket.setTimeout(10000); // 10s timeout
+      : net.connect(options);
 
     socket.once("secureConnect", () => {
       console.log("[Notification] TLS Connection established.");
-      resolve(socket);
+      resolve(socket as tls.TLSSocket);
     });
     
     socket.once("connect", () => {
@@ -231,7 +238,7 @@ const connectSmtp = (config: SmtpConfig) =>
 
     socket.once("timeout", () => {
       socket.destroy();
-      reject(new Error("SMTP Connection Timeout"));
+      reject(new Error("SMTP Connection Timeout (15s)"));
     });
 
     socket.once("error", (err) => {
@@ -239,6 +246,38 @@ const connectSmtp = (config: SmtpConfig) =>
       reject(err);
     });
   });
+
+const sendBookingNotification = async (input: BookingNotificationInput): Promise<BookingNotificationResult> => {
+  const config = getSmtpConfig();
+
+  if (!config) {
+    console.warn("[Notification] SMTP config missing. Skipping email.");
+    return {
+      event: input.event,
+      status: "skipped",
+      reason: "SMTP configuration is missing.",
+    };
+  }
+
+  try {
+    console.log(`[Notification] Attempting to send ${input.event} email to: ${input.booking.customer.email || input.booking.customer.normalizedEmail}`);
+    const result = await sendSmtpEmail(config, input);
+    console.log(`[Notification] Email sent successfully. MessageID: ${result.messageId}`);
+
+    return {
+      event: input.event,
+      status: result.status,
+      messageId: result.messageId,
+    };
+  } catch (error: any) {
+    console.error("[Notification] SMTP Fatal Error:", error);
+    return {
+      event: input.event,
+      status: "failed",
+      reason: error instanceof Error ? error.message : "Unknown notification error.",
+    };
+  }
+};
 
 const sendSmtpEmail = async (config: SmtpConfig, input: BookingNotificationInput) => {
   const socket = await connectSmtp(config);
@@ -406,34 +445,4 @@ const buildHtml = (input: BookingNotificationInput) => {
   `;
 };
 
-export async function sendBookingNotification(input: BookingNotificationInput): Promise<BookingNotificationResult> {
-  const config = getSmtpConfig();
-
-  if (!config) {
-    console.warn("[Notification] SMTP config missing. Skipping email.");
-    return {
-      event: input.event,
-      status: "skipped",
-      reason: "SMTP configuration is missing.",
-    };
-  }
-
-  try {
-    console.log(`[Notification] Attempting to send ${input.event} email to: ${input.booking.customer.email || input.booking.customer.normalizedEmail}`);
-    const result = await sendSmtpEmail(config, input);
-    console.log(`[Notification] Email sent successfully. MessageID: ${result.messageId}`);
-
-    return {
-      event: input.event,
-      status: result.status,
-      messageId: result.messageId,
-    };
-  } catch (error: any) {
-    console.error("[Notification] SMTP Error:", error.message);
-    return {
-      event: input.event,
-      status: "failed",
-      reason: error instanceof Error ? error.message : "Unknown notification error.",
-    };
-  }
-}
+export { sendBookingNotification };
